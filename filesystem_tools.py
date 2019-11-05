@@ -4,6 +4,10 @@
 
 import os
 import re
+
+import numpy as np
+import pandas as pd
+
 from strings_tools import sort_strings_by_digit
 
 
@@ -112,3 +116,26 @@ def files_with_name_lister(root_path, input_name, full_name_option=True, sub_fol
     return sorted_list
 
 
+def peer_strong_motion_2csv(csv_file_path):
+    """
+    Accommodates typical Strong motion record from PEER, that comes in a plane text file
+    with data disposed in horizontal consecutive arrays.
+    This function serializes all horizontal data in one single column and returns the
+    new data frame in a csv file.
+    Input: csv_file_path. Path of the csv file containing strong motion record.
+    Output: corrected version of the input file.
+    """
+    df = pd.read_csv(csv_file_path, header=None)
+    df_trans = df.transpose()
+    df_out = pd.DataFrame()
+    df_out['loco'] = np.array([0])
+
+    column = []
+    for i in df_trans:
+        column.append(df_trans[i])
+
+    combined = pd.concat(column, ignore_index=True)
+    df_out = pd.DataFrame()
+    df_out['A'] = combined
+    df_out.to_csv(csv_file_path.replace('.csv', '') + '_corrected.csv', index=False)
+    return
