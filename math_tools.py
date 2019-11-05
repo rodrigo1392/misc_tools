@@ -3,7 +3,6 @@
     https://github.com/rodrigo1392"""
 
 import math
-
 import numpy as np
 
 
