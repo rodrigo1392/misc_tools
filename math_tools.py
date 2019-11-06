@@ -49,6 +49,28 @@ def detailed_1d_num_integral(x, y, verbose=False):
     return integral
 
 
+def detailed_equations_system_solver(variables, equations, replace_values=False):
+    """
+    Solves system of equations using sympy library.
+    Inputs: variables. List of independent variables to be solve for.
+            equations. List of sympy equation objects.
+            replace_values. If not False, substitute variables for given values in dict form.
+    Output: dict of solutions for every variable.
+    """
+    from sympy.solvers.solveset import nonlinsolve, linsolve
+    solution = nonlinsolve(equations, *variables)
+    solution = {variable: list(solution)[0][pos] for pos, variable in enumerate(variables)}
+    if replace_values:
+        solution = {key: sp.simplify(sympy_recursive_substitution(val, VALUES)) for key, val in solution.items()}
+    try:
+        from IPython.display import display
+        sp.init_printing(use_latex=True, forecolor='White')
+        display(solution)
+    except ImportError:
+        print(solution)
+    return solution
+
+
 def primes_generator(amount):
     """
     Generates first n primes.
@@ -91,6 +113,23 @@ def round_up_n(x, base=5):
     Output: Int of rounded number.
     """
     return int(math.ceil(x / base)) * base
+
+
+def sympy_recursive_substitution(expression, substitute_dict):
+    """
+    Recursively substitutes values into sympy expressions.
+    They can be numbers or other algebraic expressions.
+    Inputs: expression. Sympy algebraic expression.
+            substitute_dict. Dict of variable:value pairs.
+    Output: Evaluated algebraic expression.
+    """
+    for _ in range(0, len(substitute_dict) + 1):
+        new_expr = expression.subs(substitute_dict)
+        if new_expr == expression:
+            return new_expr
+        else:
+            expression = new_expr
+    return
 
 
 def ishigami_eq(x1, x2, x3):
