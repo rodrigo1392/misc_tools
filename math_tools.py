@@ -61,7 +61,8 @@ def detailed_equations_system_solver(variables, equations, replace_values=False)
     solution = nonlinsolve(equations, *variables)
     solution = {variable: list(solution)[0][pos] for pos, variable in enumerate(variables)}
     if replace_values:
-        solution = {key: sp.simplify(sympy_recursive_substitution(val, VALUES)) for key, val in solution.items()}
+        solution = {key: sp.simplify(sympy_recursive_substitution(val, replace_values)) for
+                    key, val in solution.items()}
     try:
         from IPython.display import display
         sp.init_printing(use_latex=True, forecolor='White')
