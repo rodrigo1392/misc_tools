@@ -49,6 +49,31 @@ def detailed_1d_num_integral(x, y, verbose=False):
     return integral
 
 
+def detailed_1d_interpolator(independent, dependent, plot=True):
+    """
+    Interpolates a 1 variable function, with the Akima algorithm.
+    Inputs: independent. Array of independent variable values.
+            dependent. Array of dependent variable values.
+            plot. If True, presents original vs interpolated curves.
+    Output: Tuple of arrays of interpolated independent and dependent values.
+    :return:
+    """
+    from scipy.interpolate import Akima1DInterpolator
+    interpolator = Akima1DInterpolator(independent, dependent)
+    new_independent = np.linspace(np.amin(independent),
+                                  np.amax(np.asarray(independent)),
+                                  10000)
+    new_dependent = interpolator(new_independent)
+    if plot:
+        from matplotlib import pyplot as plt
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111)
+        ax.plot(independent, dependent, marker='o')
+        ax.plot(new_independent, new_dependent)
+        plt.show()
+    return new_independent, new_dependent
+
+
 def detailed_equations_system_solver(variables, equations, replace_values=False):
     """
     Solves system of equations using sympy library.
@@ -58,7 +83,14 @@ def detailed_equations_system_solver(variables, equations, replace_values=False)
     Output: dict of solutions for every variable.
     """
     from sympy.solvers.solveset import nonlinsolve, linsolve
-    solution = nonlinsolve(equations, *variables)
+    # Use linear solver if Matrix is present in equation system.
+    # Use the non linear solver otherwise
+    solver = nonlinsolve
+    for eq in equations:
+        if isinstance(eq, sp.Matrix):
+            solver = linsolve
+            break
+    solution = solver(equations, *variables)
     solution = {variable: list(solution)[0][pos] for pos, variable in enumerate(variables)}
     if replace_values:
         solution = {key: sp.simplify(sympy_recursive_substitution(val, replace_values)) for

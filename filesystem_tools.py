@@ -116,6 +116,39 @@ def files_with_name_lister(root_path, input_name, full_name_option=True, sub_fol
     return sorted_list
 
 
+def folder_size(start_path='.'):
+    """
+    Calculates the size of a given folder.
+    Input: start_path. Top level folder of interest. If none provided,
+    starts on current interpreter chdir.
+    Output: Size of folder in MB.
+    """
+    total_size = 0
+    for dir_path, dir_names, file_names in os.walk(start_path):
+        for f in file_names:
+            fp = os.path.join(dir_path, f)
+            total_size += os.path.getsize(fp)
+    return total_size/(1024*1024)  # Size in MB
+
+
+def folder_walk_level(root_path, level=1):
+    """
+    Returns a generator to be used in a recursively os file walking. It limits the level of sub_folders
+    available for the walker algorithm.
+    Inputs: root_path. Absolute path of top level folder of interest.
+            level. Int, accounts for sub_folders levels.
+    Output: Generator.
+    """
+    root_path = root_path.rstrip(os.path.sep)
+    assert os.path.isdir(root_path)
+    num_sep = root_path.count(os.path.sep)
+    for root, dirs, files in os.walk(root_path):
+        yield root, dirs, files
+        num_sep_this = root.count(os.path.sep)
+        if num_sep + level <= num_sep_this:
+            del dirs[:]
+
+
 def peer_strong_motion_2csv(csv_file_path):
     """
     Accommodates typical Strong motion record from PEER, that comes in a plane text file
