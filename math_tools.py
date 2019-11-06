@@ -3,6 +3,7 @@
     https://github.com/rodrigo1392"""
 
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -29,6 +30,23 @@ def array_extract_unique_sub_arrays(array):
     types = np.dtype((np.void, array.dtype.itemsize * np.prod(array.shape[1:])))  # Deal with data types
     b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)  # Store array in efficient way
     return array[np.unique(b, return_index=True)[1]]
+
+
+def detailed_1d_num_integral(x, y, verbose=False):
+    """
+    Calculates the numerical integral value of y(x), between the limits given by the x array domain.
+    Plots the function for more comprehension.
+    Inputs: x. Array of independent variable values.
+            y. Array of dependent variable values.
+            verbose. Optional boolean. If True, print the value of the integral.
+    Output: Float value of the integral.
+    """
+    integral = np.trapz(x, y)
+    plt.plot(x, y, markersize=5, marker='o')
+    plt.show()
+    if verbose:
+        print('Integral value:', round(integral, 2))
+    return integral
 
 
 def primes_generator(amount):
