@@ -5,6 +5,26 @@
 import re
 
 
+def letters_list(start_char='A', end_char='Z', capitalize=True):
+    """
+    Generates a list of alphabetically order english letters.
+    It can go beyond Z, with AA, AB,... format
+    Inputs: start_char. Character to start from. 
+            end_char. Last character on the list. 
+            capitalize. Boolean. If True, output are capital letters 
+    Output: List of character strings. 
+    """
+    import string
+    base_list = [i for i in string.ascii_lowercase]
+    for i in base_list:
+        base_list = base_list + [i + c for c in string.ascii_lowercase]
+    output_list = base_list[base_list.index(start_char.lower()):
+                            base_list.index(end_char.lower()) + 1]
+    if capitalize is True:
+        output_list = [c.upper() for c in output_list]
+    return output_list
+
+
 def sort_strings_by_digit(strings_list):
     """
     Returns a by-digits-sorted version of input strings_list. If digits are not present on the strings,
