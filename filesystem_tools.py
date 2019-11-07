@@ -4,11 +4,66 @@
 
 import os
 import re
+import sys
 
 import numpy as np
 import pandas as pd
 
-from strings_tools import sort_strings_by_digit
+from .strings_tools import sort_strings_by_digit
+
+
+def check_corrupted_videos(root_path, extensions):
+    """
+    Checks for video files with given extensions, recursively in the root_path
+    Inputs: root_path. Path to be investigated.
+            extensions. List of file extensions to look for.
+    Output: Tuple of amount of good and bad files.
+    """
+    try:
+        import cv2  # https://pypi.python.org/pypi/opencv-python
+    except ImportError:
+        sys.exit('NO CV2 MODULE FOUND')
+    try:
+        import tqdm
+        progress_bar = True
+    except ImportError:
+        print('No tqdm module found. Progress bar will not be shown')
+        progress_bar = False
+        pass
+
+        # Print Python and CV info
+    print("Python version:", sys.version)
+    print("CV2:   ", cv2.__version__)
+
+    # Gather paths of video files
+    files_paths = files_with_extension_lister(root_path, extensions)
+
+    # Prepare list for progress bar
+    if progress_bar:
+        files_paths = tqdm.tqdm(files_paths)
+
+    # Process files
+    good_files_counter = 0
+    for filename in files_paths:
+        # produce error
+        try:
+            vid = cv2.VideoCapture(filename)
+            if not vid.isOpened():
+                print('FILE NOT FOUND:' + filename)
+                raise NameError('File not found')
+        except cv2.error:
+            print('error:' + filename)
+            print("cv2.error:")
+        except Exception as e:
+            print("Exception:", e)
+            print('error:' + filename)
+        else:
+            good_files_counter += 1
+
+    # OUTPUT MESSAGES
+    print("Good files:", good_files_counter)
+    print("Bad files:", len(files_paths) - good_files_counter)
+    return good_files_counter, len(files_paths) - good_files_counter
 
 
 def file_finder(root_path, searched_file, sub_folders_option=False):
@@ -85,18 +140,18 @@ def files_renumber(strings_list, delta):
     return
 
 
-def files_with_extension_lister(root_path, extension, full_name_option=True, sub_folders_option=True):
+def files_with_extension_lister(root_path, extensions, full_name_option=True, sub_folders_option=True):
     """
     Lists all the files in root_path that matches the extension.
     Inputs: root_path. Path to be investigated.
-            extension. String with the extension of files to be searched for.
+            extension. List of strings with the extensions of files to be searched for.
             full_name_option. Boolean, if True, return files with full path.
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     Output: List of files with extension.
     """
     strings_list = files_lister(root_path, full_name_option, sub_folders_option)
-    extension = extension.replace('.', '')  # Delete the . in extension, to normalize it.
-    files_out = [i for i in strings_list if i.endswith('.' + extension)]  # Extract only files with given extension.
+    extensions = ['.' + i.replace('.', '') for i in list(extensions)]  # Normalize extensions.
+    files_out = [i for i in strings_list if i.endswith(tuple(extensions))]  # Extract only files with given extension.
     sorted_list = sort_strings_by_digit(files_out)  # Try to sort files by digits. Do nothing otherwise.
     return sorted_list
 
