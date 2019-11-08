@@ -7,8 +7,10 @@ import re
 import sys
 
 import numpy as np
-import pandas as pd
-
+try:
+    import pandas as pd
+except ImportError:
+    pass
 from .strings_tools import sort_strings_by_digit
 
 
