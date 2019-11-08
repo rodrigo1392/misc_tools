@@ -151,8 +151,8 @@ def files_with_extension_lister(root_path, extensions, full_name_option=True, su
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     Output: List of files with extension.
     """
-    if not isinstance(extensions, list):
-        extensions = list(extensions)
+    if not isinstance(extensions, list) and not isinstance(extensions, tuple):
+        extensions = [extensions]
     strings_list = files_lister(root_path, full_name_option, sub_folders_option)
     extensions = ['.' + i.replace('.', '') for i in extensions]  # Normalize extensions.
     files_out = [i for i in strings_list if i.endswith(tuple(extensions))]  # Extract only files with given extension.
