@@ -2,3 +2,5 @@
 *.iml
 __pycache__/
 telegram_bot_send_message.cfg
+*.pyc
+*.log
