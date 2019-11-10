@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+SI_PHYSICAL_CONSTANTS = {'gravity': 9.80665}
+CONVERSIONS_FACTORS = {'loco': 1}
+
+
 def array_1d_consecutiveness_check(array):
     """
     Check for consecutiveness of elements of mono-dimensional array.
