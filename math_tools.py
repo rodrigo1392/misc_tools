@@ -7,8 +7,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-SI_PHYSICAL_CONSTANTS = {'gravity': 9.80665}
-CONVERSIONS_FACTORS = {'loco': 1}
+SI_PHYSICAL_CONSTANTS = {'gravity': 9.80665,  # in m/s2
+                         }
+CONVERSIONS_FACTORS = {'N-kgf': SI_PHYSICAL_CONSTANTS['gravity'],                    # Newton to kgf
+                       'MPa-kgf/cm2': 100 * (1 / SI_PHYSICAL_CONSTANTS['gravity']),  # MPa to kgf/cm2
+                       'kg/m3-kg/cm3': (1 / 1000000),                                # kg/m3 to kg/cm3
+                        }
+
+
+def unit_convert(quantity, conversion, inverse=0):
+    if not inverse:
+        return quantity * CONVERSIONS_FACTORS[conversion]
+    else:
+        return quantity * (1 / CONVERSIONS_FACTORS[conversion])
 
 
 def array_1d_consecutiveness_check(array):
@@ -150,6 +161,16 @@ def round_up_n(x, base=5):
     Output: Int of rounded number.
     """
     return int(math.ceil(x / base)) * base
+
+
+def round_down_n(x, base=5):
+    """
+    Rounds down a float to an integer multiple of base.
+    Inputs: x. Float to round up.
+            base. Multiple of which to round up to.
+    Output: Int of rounded number.
+    """
+    return int(math.floor(x / base)) * base
 
 
 def sympy_recursive_substitution(expression, substitute_dict):
