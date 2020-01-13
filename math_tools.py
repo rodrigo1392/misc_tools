@@ -197,3 +197,13 @@ def ishigami_eq(x1, x2, x3):
     on x3, as described by Sobol & Levitan (1999).
     """
     return np.sin(x1) + 7 * np.sin(x2) ** 2 + 0.1 * x3 ** 4 * np.sin(x1)
+
+
+def white_noise_generator(mean, std, num_samples):
+    """
+    Generates normalized random values.
+    Inputs: mean. Mean of the output array.
+            std. Standard deviation of the output array.
+    Output: Array of random values.
+    """
+    return np.random.normal(mean, std, size=num_samples)
