@@ -11,7 +11,7 @@ try:
     import pandas as pd
 except ImportError:
     pass
-from strings_tools import sort_strings_by_digit
+from .strings_tools import sort_strings_by_digit
 
 
 def check_corrupted_videos(root_path, extensions):
