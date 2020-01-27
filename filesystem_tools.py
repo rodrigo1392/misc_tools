@@ -8,6 +8,10 @@ import sys
 
 import numpy as np
 try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
+try:
     import pandas as pd
 except ImportError:
     pass
