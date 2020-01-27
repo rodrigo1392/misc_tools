@@ -30,7 +30,8 @@ def config_file_extract_input(config_file):
     # EXTRACT AND PROCESS INPUT DATA
     input_data = ({k: eval(repr(v)) for k, v in cfg.items(i)}
                   for i in cfg.sections())                                        # Generate output for all sections
-    input_data = {k: v for i in input_data for k, v in i.items()}                 # Merge input data in one dict
+    input_data = {k: (None if v is '0' else v)
+                  for i in input_data for k, v in i.items()}                      # Merge input data in one dict
     return input_data
 
 
