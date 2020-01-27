@@ -14,6 +14,21 @@ except ImportError:
 from .strings_tools import sort_strings_by_digit
 
 
+def config_file_extract_input(config_file):
+    """
+    Extract input data from *.cfg file.
+    Input: config_file. Cfg file containing input data in an arbitrary
+    number of sections and variables.
+    Output: Dict of input variable name: value pairs.
+    """
+    cfg = configparser.ConfigParser()
+    cfg.read(config_file)
+    # EXTRACT AND PROCESS INPUT DATA
+    input_data = ({k: eval(v) for k, v in cfg.items(i)} for i in cfg.sections())  # Generate output for all sections
+    input_data = {k: v for i in input_data for k, v in i.items()}                 # Merge input data in one dict
+    return input_data
+
+
 def check_corrupted_videos(root_path, extensions):
     """
     Checks for video files with given extensions, recursively in the root_path
