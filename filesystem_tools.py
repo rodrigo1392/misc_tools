@@ -32,7 +32,15 @@ def config_file_extract_input(config_file):
                   for i in cfg.sections())                                        # Generate output for all sections
     input_data = {k: (None if v is '0' else v)
                   for i in input_data for k, v in i.items()}                      # Merge input data in one dict
-    return input_data
+    output_data = {}
+    for k, v in input_data.items():
+        try:
+            output_data[k] = eval(v)
+        except SyntaxError:
+            output_data[k] = v
+        except TypeError:
+            output_data[k] = v
+    return output_data
 
 
 def check_corrupted_videos(root_path, extensions):
@@ -98,7 +106,7 @@ def dataframe_safe_save(data_frame, output_csv, overwrite_csv=False):
     """
     # Normalize csv file path
     filename_to_print = output_csv.split('/')[-1].replace('.csv', '')
-    if os.path.exists(filename):
+    if os.path.exists(output_csv):
         print('WARNING: CSV FILE EXISTS')
         if overwrite_csv:
             data_frame.to_csv(output_csv, index=False, mode='w+')
