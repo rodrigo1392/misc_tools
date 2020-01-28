@@ -5,8 +5,8 @@
 import os
 import re
 import sys
-
 import numpy as np
+import pandas as pd
 try:
     import configparser
 except ImportError:
@@ -89,6 +89,28 @@ def check_corrupted_videos(root_path, extensions):
     return good_files_counter, len(files_paths) - good_files_counter
 
 
+def dataframe_safe_save(data_frame, output_csv, overwrite_csv=False):
+    """
+    Saves a pandas dataframe to a csv, avoiding non intentional overwriting.
+    Inputs: data_frame. Pandas Dataframe to be saved.
+            output_csv. Path of output csv.
+            overwrite_csv. Boolean, if True, overwrite output file. Do nothing otherwise.
+    """
+    # Normalize csv file path
+    filename_to_print = output_csv.split('/')[-1].replace('.csv', '')
+    if os.path.exists(filename):
+        print('WARNING: CSV FILE EXISTS')
+        if overwrite_csv:
+            data_frame.to_csv(output_csv, index=False, mode='w+')
+            print(filename_to_print, 'CSV FILE OVERWRITTEN')
+        else:
+            print(filename_to_print, 'CSV FILE NOT SAVED')
+    else:
+        data_frame.to_csv(output_csv, index=False, mode='w')
+        print(filename_to_print, '*** CSV FILE SAVED ***')
+    return
+
+
 def file_finder(root_path, searched_file, sub_folders_option=False):
     """
     Finds a file looking in the root_path. It can return multiple found instances.
@@ -163,6 +185,26 @@ def files_renumber(strings_list, delta):
     return
 
 
+def file_save_with_old_version(filepath):
+    """
+    Avoids file overwriting, by saving previous version of filepath with and 'old_' prefix
+    Input: filepath. Path of file to be saved.
+    """
+    # Split directory from file name
+    folder_path, file_name = os.path.dirname(filepath), os.path.basename(filepath)
+    # Save original file with 'old_' prefix
+    base_version_file = folder_path + '/old_' + file_name
+    if os.path.exists(base_version_file):
+        return base_version_file
+    # If not previously saved old file is found, create one for future use
+    elif os.path.exists(filepath):
+        shutil.copy(filepath, base_version_file)
+        return base_version_file
+    else:
+        print(filepath, 'FILE NOT FOUND IN', folder_path)
+        return None
+
+
 def files_with_extension_lister(root_path, extensions, full_name_option=True, sub_folders_option=True):
     """
     Lists all the files in root_path that matches the extension.
@@ -194,6 +236,17 @@ def files_with_name_lister(root_path, input_name, full_name_option=True, sub_fol
     files_out = [i for i in strings_list if input_name in i]  # Extract only files containing input_name on them.
     sorted_list = sort_strings_by_digit(files_out)  # Try to sort files by digits. Do nothing otherwise.
     return sorted_list
+
+
+def folder_create_if_not(folder_path):
+    """
+    Creates folder if it does not exist.
+    Input: folder_path. Path of folder to be verified/created.
+    """
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        print(folder_path, 'folder created')
+    return
 
 
 def folder_size(start_path='.'):
