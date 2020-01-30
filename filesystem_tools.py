@@ -2,45 +2,23 @@
     Developed by Rodrigo Rivero.
     https://github.com/rodrigo1392"""
 
-import os
-import re
-import sys
-import numpy as np
-import pandas as pd
+
+# Flexibility for python 2.x
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+# Flexibility for old versions without pandas
 try:
     import pandas as pd
 except ImportError:
     pass
+import numpy as np
+import os
+import re
+import shutil
+import sys
 from .strings_tools import sort_strings_by_digit
-
-
-def config_file_extract_input(config_file):
-    """
-    Extract input data from *.cfg file.
-    Input: config_file. Cfg file containing input data in an arbitrary
-    number of sections and variables.
-    Output: Dict of input variable name: value pairs.
-    """
-    cfg = configparser.ConfigParser()
-    cfg.read(config_file)
-    # EXTRACT AND PROCESS INPUT DATA
-    input_data = ({k: eval(repr(v)) for k, v in cfg.items(i)}
-                  for i in cfg.sections())                                        # Generate output for all sections
-    input_data = {k: (None if v is '0' else v)
-                  for i in input_data for k, v in i.items()}                      # Merge input data in one dict
-    output_data = {}
-    for k, v in input_data.items():
-        try:
-            output_data[k] = eval(v)
-        except SyntaxError:
-            output_data[k] = v
-        except TypeError:
-            output_data[k] = v
-    return output_data
 
 
 def check_corrupted_videos(root_path, extensions):
@@ -97,6 +75,31 @@ def check_corrupted_videos(root_path, extensions):
     return good_files_counter, len(files_paths) - good_files_counter
 
 
+def config_file_extract_input(config_file):
+    """
+    Extract input data from *.cfg file.
+    Input: config_file. Cfg file containing input data in an arbitrary
+    number of sections and variables.
+    Output: Dict of input variable name: value pairs.
+    """
+    cfg = configparser.ConfigParser()
+    cfg.read(config_file)
+    # EXTRACT AND PROCESS INPUT DATA
+    input_data = ({k: eval(repr(v)) for k, v in cfg.items(i)}
+                  for i in cfg.sections())                                        # Generate output for all sections
+    input_data = {k: (None if v is '0' else v)
+                  for i in input_data for k, v in i.items()}                      # Merge input data in one dict
+    output_data = {}
+    for k, v in input_data.items():
+        try:
+            output_data[k] = eval(v)
+        except SyntaxError:
+            output_data[k] = v
+        except TypeError:
+            output_data[k] = v
+    return output_data
+
+
 def dataframe_safe_save(data_frame, output_csv, overwrite_csv=False):
     """
     Saves a pandas dataframe to a csv, avoiding non intentional overwriting.
@@ -134,6 +137,26 @@ def file_finder(root_path, searched_file, sub_folders_option=False):
         print('File not found')
         return False
     return file_path
+
+
+def file_save_with_old_version(filepath):
+    """
+    Avoids file overwriting, by saving previous version of filepath with and 'old_' prefix
+    Input: filepath. Path of file to be saved.
+    """
+    # Split directory from file name
+    folder_path, file_name = os.path.dirname(filepath), os.path.basename(filepath)
+    # Save original file with 'old_' prefix
+    base_version_file = folder_path + '/old_' + file_name
+    if os.path.exists(base_version_file):
+        return base_version_file
+    # If not previously saved old file is found, create one for future use
+    elif os.path.exists(filepath):
+        shutil.copy(filepath, base_version_file)
+        return base_version_file
+    else:
+        print(filepath, 'FILE NOT FOUND IN', folder_path)
+        return None
 
 
 def files_in_folder_2txt(root_path, out_file_path, full_name_option=False, sub_folders_option=False):
@@ -191,26 +214,6 @@ def files_renumber(strings_list, delta):
         file_name = file_name.replace('\\\\', '\\')
         os.rename(file_name, new_file_name)  # Rename files.
     return
-
-
-def file_save_with_old_version(filepath):
-    """
-    Avoids file overwriting, by saving previous version of filepath with and 'old_' prefix
-    Input: filepath. Path of file to be saved.
-    """
-    # Split directory from file name
-    folder_path, file_name = os.path.dirname(filepath), os.path.basename(filepath)
-    # Save original file with 'old_' prefix
-    base_version_file = folder_path + '/old_' + file_name
-    if os.path.exists(base_version_file):
-        return base_version_file
-    # If not previously saved old file is found, create one for future use
-    elif os.path.exists(filepath):
-        shutil.copy(filepath, base_version_file)
-        return base_version_file
-    else:
-        print(filepath, 'FILE NOT FOUND IN', folder_path)
-        return None
 
 
 def files_with_extension_lister(root_path, extensions, full_name_option=True, sub_folders_option=True):
