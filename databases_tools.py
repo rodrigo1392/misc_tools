@@ -33,6 +33,45 @@ def dataframe_safe_save(data_frame, output_csv, overwrite_csv=False):
     return
 
 
+def h5db_print_attrs(h5_object):
+    """
+    Prints main structure of hdf5 file.
+    Input: hdf5 opened file to explore.
+    """
+    def print_attrs(name):
+        print(name)                             # Print filename and attributes
+    h5_object.visititems(print_attrs)           # Call inner function
+
+
+def npz_to_hdf5(npz_files_list, hdf5_path, attributes_dict=None, print_structure=False):
+    """
+    Saves content of multiple npz files into a hdf5 database file.
+    Inputs: npz_files_list. List of Paths of input npz files.
+            hdf5_filename. Path of output file.
+            attributes_dict. List of groups attributes values.
+            print_structure. If True, print structure of output hdf5 file.
+    Output: List of output reference values, taken from keys of arrays in npz files.
+    """
+    if not hdf5_path:
+        hdf5_path = Path(npz_files_list[0]).with_suffix('.hdf5')   # Match output file name to npz file if none given
+    ref_vars = []
+    with h5py.File(hdf5_path, 'w') as output_file:
+        for model_pos, npz_path in enumerate(npz_files_list):
+            model_no = model_pos + 1                               # Use npz position in list as key for hdf5 groups
+            grp = output_file.create_group(str(model_no))          # Create a group for each npz file
+            if attributes_dict:                                    # Set values of interest as group attributes
+                for k, v in attributes_dict[model_pos]:
+                    grp.attrs[k] = v
+            arrays = {k: v for k, v in np.load(npz_path).items()}  # Load npz arrays
+            ref_vars.extend(arrays.keys())                         # Save arrays keys as output variable references
+            for k, v in arrays.items():                            # Save npz arrays as data-sets
+                grp.create_dataset(k, data=v)
+    if print_structure:                                            # Print output file structure
+        with h5py.File(hdf5_path, 'r') as f:
+            h5db_print_attrs(f)
+    return list(set(ref_vars))                                     # Return unique variable references values
+
+
 def peer_strong_motion_2csv(csv_file_path):
     """
     Accommodates typical Strong motion record from PEER, that comes in a plane text file
