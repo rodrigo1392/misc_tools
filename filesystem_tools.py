@@ -2,15 +2,12 @@
     Developed by Rodrigo Rivero.
     https://github.com/rodrigo1392"""
 
-
-# Flexibility for python 2.x
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-# Flexibility for old versions without pandas
 try:
-    import pandas as pd
+    from pathlib import Path
 except ImportError:
     pass
 import numpy as np
@@ -18,7 +15,7 @@ import os
 import re
 import shutil
 import sys
-from .strings_tools import sort_strings_by_digit
+from strings_tools import sort_strings_by_digit, str_extract_last_int
 
 
 def check_corrupted_videos(root_path, extensions):
@@ -39,22 +36,15 @@ def check_corrupted_videos(root_path, extensions):
         print('No tqdm module found. Progress bar will not be shown')
         progress_bar = False
         pass
-
-        # Print Python and CV info
-    print("Python version:", sys.version)
+    print("Python version:", sys.version)           # Print Python and CV info
     print("CV2:   ", cv2.__version__)
-
-    # Gather paths of video files
-    files_paths = files_with_extension_lister(root_path, extensions)
-
-    # Prepare list for progress bar
-    if progress_bar:
+    files_paths = []                                # Gather paths of video files
+    for extension in extensions:
+        files_paths.extend(files_with_extension_lister(root_path, extension))
+    if progress_bar:                                # Prepare list for progress bar
         files_paths = tqdm.tqdm(files_paths)
-
-    # Process files
-    good_files_counter = 0
+    good_files_counter = 0                          # Process files
     for filename in files_paths:
-        # produce error
         try:
             vid = cv2.VideoCapture(filename)
             if not vid.isOpened():
@@ -68,9 +58,7 @@ def check_corrupted_videos(root_path, extensions):
             print('error:' + filename)
         else:
             good_files_counter += 1
-
-    # OUTPUT MESSAGES
-    print("Good files:", good_files_counter)
+    print("Good files:", good_files_counter)        # Output messages
     print("Bad files:", len(files_paths) - good_files_counter)
     return good_files_counter, len(files_paths) - good_files_counter
 
@@ -78,19 +66,19 @@ def check_corrupted_videos(root_path, extensions):
 def config_file_extract_input(config_file):
     """
     Extract input data from *.cfg file.
-    Input: config_file. Cfg file containing input data in an arbitrary
-    number of sections and variables.
+    Input: config_file. Path of file containing input data in an arbitrary
+           number of sections and variables.
     Output: Dict of input variable name: value pairs.
     """
     cfg = configparser.ConfigParser()
     cfg.read(config_file)
     # EXTRACT AND PROCESS INPUT DATA
-    input_data = ({k: eval(repr(v)) for k, v in cfg.items(i)}
-                  for i in cfg.sections())                                        # Generate output for all sections
+    input_data = ({k.lower(): eval(repr(v)) for k, v in cfg.items(i)}
+                  for i in cfg.sections())                      # Generate output for all sections
     input_data = {k: (None if v is '0' else v)
                   for i in input_data for k, v in i.items()}                      # Merge input data in one dict
     output_data = {}
-    for k, v in input_data.items():
+    for k, v in input_data.items():         # Attempt to convert input strings into Python objects
         try:
             output_data[k] = eval(v)
         except SyntaxError:
@@ -98,28 +86,6 @@ def config_file_extract_input(config_file):
         except TypeError:
             output_data[k] = v
     return output_data
-
-
-def dataframe_safe_save(data_frame, output_csv, overwrite_csv=False):
-    """
-    Saves a pandas dataframe to a csv, avoiding non intentional overwriting.
-    Inputs: data_frame. Pandas Dataframe to be saved.
-            output_csv. Path of output csv.
-            overwrite_csv. Boolean, if True, overwrite output file. Do nothing otherwise.
-    """
-    # Normalize csv file path
-    filename_to_print = output_csv.split('/')[-1].replace('.csv', '')
-    if os.path.exists(output_csv):
-        print('WARNING: CSV FILE EXISTS')
-        if overwrite_csv:
-            data_frame.to_csv(output_csv, index=False, mode='w+')
-            print(filename_to_print, 'CSV FILE OVERWRITTEN')
-        else:
-            print(filename_to_print, 'CSV FILE NOT SAVED')
-    else:
-        data_frame.to_csv(output_csv, index=False, mode='w')
-        print(filename_to_print, '*** CSV FILE SAVED ***')
-    return
 
 
 def file_finder(root_path, searched_file, sub_folders_option=False):
@@ -131,50 +97,58 @@ def file_finder(root_path, searched_file, sub_folders_option=False):
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders
     Output: Full path(s) of searched file.
     """
-    strings_list = files_lister(root_path, True, sub_folders_option)
-    file_path = [i for i in strings_list if os.path.basename(i) == searched_file]
+    paths_list = files_lister(root_path, True, sub_folders_option)
+    file_path = [i for i in paths_list if str(i.name) == searched_file]
     if not file_path:
         print('File not found')
         return False
     return file_path
 
 
-def file_save_with_old_version(filepath):
+def file_renumber(file_path, delta):
     """
-    Avoids file overwriting, by saving previous version of filepath with and 'old_' prefix
-    Input: filepath. Path of file to be saved.
+    Renames a file, modifying its original name, by adding delta to the last digit found in it.
+    Input: file_path. Path of file to be renamed.
+           delta. Int of number to be added.
     """
-    # Split directory from file name
-    folder_path, file_name = os.path.dirname(filepath), os.path.basename(filepath)
-    # Save original file with 'old_' prefix
-    base_version_file = folder_path + '/old_' + file_name
-    if os.path.exists(base_version_file):
-        return base_version_file
-    # If not previously saved old file is found, create one for future use
-    elif os.path.exists(filepath):
-        shutil.copy(filepath, base_version_file)
-        return base_version_file
+    file_path = Path(file_path)                                                       # Normalize input to Path object
+    number = str_extract_last_int(file_path)                                          # Find numbers in original names.
+    file_path.rename(Path(str(file_path).replace(str(number), str(number + delta))))  # Rename file
+    return
+
+
+def file_save_with_old_version(file_path):
+    """
+    Avoids file overwriting, by saving previous version of file with and 'old_' prefix.
+    Input: file_path. Path of file to be saved.
+    """
+    file_path = Path(file_path)
+    base_version_file = Path(str(file_path).replace(file_path.name, 'old_' + file_path.name))  # Old version file Path
+    if base_version_file.exists():                                               # Return old version of file as current
+        shutil.copy(str(base_version_file), str(file_path))
+        return file_path
+    elif Path(file_path).exists():                                               # If not old file is found, create it
+        shutil.copy(file_path, base_version_file)
+        return file_path
     else:
-        print(filepath, 'FILE NOT FOUND IN', folder_path)
+        print(Path(file_path).name, 'FILE NOT FOUND IN', str(file_path.parent))  # Report if no file was found
         return None
 
 
-def files_in_folder_2txt(root_path, out_file_path, full_name_option=False, sub_folders_option=False):
+def files_in_folder_2txt(root_path, out_file_path=None, full_name_option=False, sub_folders_option=False):
     """
-    Saves all files found in root_path into a out_file txt.
+    Saves all files found in root_path in a txt file.
     Inputs: root_path. Path to be investigated.
             out_file_path. Path of output file.
             full_name_option. Boolean, if True, return files with full path.
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     """
-    if not out_file_path.endswith('.txt'):  # Add txt extension if missing.
-        out_file_path = out_file_path + '.txt'
-    strings_list = files_lister(root_path, full_name_option, sub_folders_option)
-    strings_list = sort_strings_by_digit(strings_list)  # Try to sort files by digits. Do nothing otherwise.
-    with open(out_file_path, 'w+') as file_out:
-        for filename in strings_list:
-            file_out.write(str(filename) + os.linesep)  # Write into output file line by line.
-    return
+    if not out_file_path:
+        out_file_path = Path(root_path, 'files_list')                           # Assign output file if none provided
+    paths_list = files_lister(root_path, full_name_option, sub_folders_option)  # List files in root
+    with open(Path(out_file_path).with_suffix('.txt'), 'w+') as file_out:       # Normalize output file suffix and write
+        file_out.write('\n'.join(paths_list))
+    return out_file_path
 
 
 def files_lister(root_path, full_name_option=True, sub_folders_option=True):
@@ -185,68 +159,43 @@ def files_lister(root_path, full_name_option=True, sub_folders_option=True):
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     Output: List of all existing files.
     """
-    root_path = str(root_path)  # Transform Path object into string.
-    current_path = os.getcwd()  # Save current directory, because os needs to change to target dir to work.
-    os.chdir(root_path)  # Change to target folder.
-    strings_list = []
-    for root, dirs, files in os.walk(root_path):
-        for file_name in files:
-            if full_name_option:
-                strings_list.append(os.path.join(root, file_name))
-            else:
-                strings_list.append(file_name)
-        if not sub_folders_option:
-            break
-    os.chdir(current_path)  # Return to original directory
-    return strings_list
+    root_path = Path(root_path)                                         # Normalize input to Path object
+    if not sub_folders_option:
+        paths_list = [f for f in root_path.iterdir() if f.is_file()]    # Get files list
+    if sub_folders_option:
+        paths_list = [f for f in root_path.rglob("*") if f.is_file()]
+    if not full_name_option:                                            # Extract only names if necessary
+        paths_list = [f.name for f in paths_list]
+    paths_list = sort_strings_by_digit(paths_list)                      # Try to sort files by digits
+    return paths_list
 
 
-def files_renumber(strings_list, delta):
+def files_with_extension_lister(root_path, extension, full_name_option=True, sub_folders_option=True):
     """
-    Renames all files in strings_list, modifying the original name by adding delta to any digit in the files names.
-    Input: strings_list. List of Full Paths of files to be renamed.
-           delta. Int of number to be added.
-    """
-    for file_name in strings_list:
-        number = int(re.findall(r'-?\d+\.?\d*', file_name)[-1].replace('.', ''))  # Find numbers in original names.
-        new_number = number + delta
-        new_file_name = file_name.replace(str(number), str(new_number))
-        file_name = file_name.replace('\\\\', '\\')
-        os.rename(file_name, new_file_name)  # Rename files.
-    return
-
-
-def files_with_extension_lister(root_path, extensions, full_name_option=True, sub_folders_option=True):
-    """
-    Lists all the files in root_path that matches the extension.
+    Lists all the files in root_path with a given extension.
     Inputs: root_path. Path to be investigated.
-            extension. List of strings with the extensions of files to be searched for.
+            extension. String with the file extension to be searched for.
             full_name_option. Boolean, if True, return files with full path.
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
-    Output: List of files with extension.
+    Output: List of Path objects.
     """
-    if not isinstance(extensions, list) and not isinstance(extensions, tuple):
-        extensions = [extensions]
-    strings_list = files_lister(root_path, full_name_option, sub_folders_option)
-    extensions = ['.' + i.replace('.', '') for i in extensions]  # Normalize extensions.
-    files_out = [i for i in strings_list if i.endswith(tuple(extensions))]  # Extract only files with given extension.
-    sorted_list = sort_strings_by_digit(files_out)  # Try to sort files by digits. Do nothing otherwise.
-    return sorted_list
+    paths_list = files_lister(root_path, full_name_option, sub_folders_option)            # List all files in root
+    paths_list = [i for i in paths_list if i.suffix == '.' + extension.replace('.', '')]  # Filter by extension
+    return paths_list
 
 
-def files_with_name_lister(root_path, input_name, full_name_option=True, sub_folders_option=True):
+def files_with_name_lister(root_path, input_string, full_name_option=True, sub_folders_option=True):
     """
-    Lists all the files in root_path that has input_name in it.
+    Lists all the files in root_path that contain a given string in its name.
     Inputs: root_path. Path to be investigated.
             input_name. String to be looked for in file names.
             full_name_option. Boolean, if True, return files with full path.
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
-    Output: List of files with extension.
+    Output: List of Path objects.
     """
-    strings_list = files_lister(root_path, full_name_option, sub_folders_option)
-    files_out = [i for i in strings_list if input_name in i]  # Extract only files containing input_name on them.
-    sorted_list = sort_strings_by_digit(files_out)  # Try to sort files by digits. Do nothing otherwise.
-    return sorted_list
+    paths_list = files_lister(root_path, full_name_option, sub_folders_option)    # List all files in root
+    paths_list = [i for i in paths_list if input_string in i.name]                # Filter by substring
+    return paths_list
 
 
 def folder_create_if_not(folder_path):
@@ -254,25 +203,25 @@ def folder_create_if_not(folder_path):
     Creates folder if it does not exist.
     Input: folder_path. Path of folder to be verified/created.
     """
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-        print(folder_path, 'folder created')
-    return
+    folder_path = Path(folder_path)                 # Normalize input to Path object
+    try:
+        folder_path.mkdir()                         # Attempt to create folder
+        print(str(folder_path), 'folder created')
+        return True
+    except FileExistsError:                         # If it already exists, do nothing
+        return False
 
 
-def folder_size(start_path='.'):
+def folder_size(root_path=None, sub_folders_option=True):
     """
     Calculates the size of a given folder.
-    Input: start_path. Top level folder of interest. If none provided,
-    starts on current interpreter chdir.
+    Input: root_path. Root folder of interest. If not given, start on current interpreter dir.
     Output: Size of folder in MB.
     """
-    total_size = 0
-    for dir_path, dir_names, file_names in os.walk(start_path):
-        for f in file_names:
-            fp = os.path.join(dir_path, f)
-            total_size += os.path.getsize(fp)
-    return total_size/(1024*1024)  # Size in MB
+    if not root_path:
+        root_path = Path.cwd()
+    paths_list = files_lister(root_path, True, sub_folders_option)            # List all files in root
+    return round(sum(f.stat().st_size for f in paths_list) / (1024*1024), 3)  # Size in MB
 
 
 def folder_walk_level(root_path, level=1):
@@ -291,28 +240,3 @@ def folder_walk_level(root_path, level=1):
         num_sep_this = root.count(os.path.sep)
         if num_sep + level <= num_sep_this:
             del dirs[:]
-
-
-def peer_strong_motion_2csv(csv_file_path):
-    """
-    Accommodates typical Strong motion record from PEER, that comes in a plane text file
-    with data disposed in horizontal consecutive arrays.
-    This function serializes all horizontal data in one single column and returns the
-    new data frame in a csv file.
-    Input: csv_file_path. Path of the csv file containing strong motion record.
-    Output: corrected version of the input file.
-    """
-    df = pd.read_csv(csv_file_path, header=None)
-    df_trans = df.transpose()
-    df_out = pd.DataFrame()
-    df_out['loco'] = np.array([0])
-
-    column = []
-    for i in df_trans:
-        column.append(df_trans[i])
-
-    combined = pd.concat(column, ignore_index=True)
-    df_out = pd.DataFrame()
-    df_out['A'] = combined
-    df_out.to_csv(csv_file_path.replace('.csv', '') + '_corrected.csv', index=False)
-    return

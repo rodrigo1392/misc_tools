@@ -3,6 +3,7 @@
     https://github.com/rodrigo1392"""
 
 import re
+import string
 
 
 def letters_list(start_char='A', end_char='Z', capitalize=True):
@@ -14,7 +15,6 @@ def letters_list(start_char='A', end_char='Z', capitalize=True):
             capitalize. Boolean. If True, output are capital letters 
     Output: List of character strings. 
     """
-    import string
     base_list = [i for i in string.ascii_lowercase]
     for i in base_list:
         base_list = base_list + [i + c for c in string.ascii_lowercase]
@@ -25,7 +25,7 @@ def letters_list(start_char='A', end_char='Z', capitalize=True):
     return output_list
 
 
-def sort_strings_by_digit(strings_list):
+def sort_strings_by_digit(paths_list):
     """
     Returns a by-digits-sorted version of input strings_list. If digits are not present on the strings,
     then returns the original input strings_list without changes.
@@ -33,12 +33,11 @@ def sort_strings_by_digit(strings_list):
     Output: List of sorted strings.
     """
     try:
-        numbers = [int(re.findall(r'-?\d+\.?\d*', i)[-1].replace('.', '')) for i in strings_list]  # Extract integers
-        sorted_list = [x for _, x in sorted(zip(numbers, strings_list))]  # Sort input strings_list by integers
-    except IndexError:  # Catch no digits error
-        sorted_list = strings_list
+        numbers = [str_extract_last_int(i) for i in paths_list]           # Extract integers
+        paths_list = [x for _, x in sorted(zip(numbers, paths_list))]     # Sort input strings_list by integers
+    except IndexError:                                                    # Catch no digits error
         print('WARNING: FILES LIST NOT SORTED BY NUMBER')
-    return sorted_list
+    return paths_list
 
 
 def str_check_if_has_numbers(input_string):
@@ -48,6 +47,15 @@ def str_check_if_has_numbers(input_string):
     Output: Boolean.
     """
     return any(char.isdigit() for char in input_string)
+
+
+def str_extract_last_int(input_string):
+    """
+    Extracts last integer present in a given string
+    Input: string. To extract integer from.
+    Output: integer value.
+    """
+    return int(re.findall(r'\d+', str(input_string))[-1])
 
 
 def str_list_2command_line(input_list):
