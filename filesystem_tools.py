@@ -15,7 +15,7 @@ import os
 import re
 import shutil
 import sys
-from strings_tools import sort_strings_by_digit, str_extract_last_int
+from .strings_tools import sort_strings_by_digit, str_extract_last_int
 
 
 def check_corrupted_videos(root_path, extensions):
@@ -162,12 +162,14 @@ def files_lister(root_path, full_name_option=True, sub_folders_option=True):
     root_path = Path(root_path)                                         # Normalize input to Path object
     if not sub_folders_option:
         paths_list = [f for f in root_path.iterdir() if f.is_file()]    # Get files list
-    if sub_folders_option:
+    else:
         paths_list = [f for f in root_path.rglob("*") if f.is_file()]
     if not full_name_option:                                            # Extract only names if necessary
         paths_list = [f.name for f in paths_list]
-    paths_list = sort_strings_by_digit(paths_list)                      # Try to sort files by digits
-    return paths_list
+    try:
+        return sort_strings_by_digit(paths_list)                        # Try to sort files by digits
+    except IndexError:
+        return paths_list
 
 
 def files_with_extension_lister(root_path, extension, full_name_option=True, sub_folders_option=True):
@@ -207,9 +209,9 @@ def folder_create_if_not(folder_path):
     try:
         folder_path.mkdir()                         # Attempt to create folder
         print(str(folder_path), 'folder created')
-        return True
+        return folder_path
     except FileExistsError:                         # If it already exists, do nothing
-        return False
+        return folder_path
 
 
 def folder_size(root_path=None, sub_folders_option=True):

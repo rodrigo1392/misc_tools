@@ -8,6 +8,8 @@ try:
     from pathlib import Path
 except ImportError:
     pass
+import h5py
+import numpy as np
 import os
 import pandas as pd
 
@@ -38,7 +40,7 @@ def h5db_print_attrs(h5_object):
     Prints main structure of hdf5 file.
     Input: hdf5 opened file to explore.
     """
-    def print_attrs(name):
+    def print_attrs(name, _):
         print(name)                             # Print filename and attributes
     h5_object.visititems(print_attrs)           # Call inner function
 
