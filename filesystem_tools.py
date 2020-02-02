@@ -85,6 +85,8 @@ def config_file_extract_input(config_file):
             output_data[k] = v
         except TypeError:
             output_data[k] = v
+        except:
+            output_data[k] = v
     return output_data
 
 
