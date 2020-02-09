@@ -15,14 +15,23 @@ def letters_list(start_char='A', end_char='Z', capitalize=True):
             capitalize. Boolean. If True, output are capital letters 
     Output: List of character strings. 
     """
-    base_list = [i for i in string.ascii_lowercase]
-    for i in base_list:
+    base_list = [i for i in string.ascii_lowercase]                              # Get list of ascii characters
+    for i in base_list:                                                          # Expand list with 'aa', 'ab', etc.
         base_list = base_list + [i + c for c in string.ascii_lowercase]
-    output_list = base_list[base_list.index(start_char.lower()):
+    output_list = base_list[base_list.index(start_char.lower()):                 # Extract chars of interest
                             base_list.index(end_char.lower()) + 1]
-    if capitalize is True:
+    if capitalize is True:                                                       # Capitalize chars in output list
         output_list = [c.upper() for c in output_list]
     return output_list
+
+
+def list_of_lists_unique(input_list):
+    """
+    Return a flat list of unique values on a list that contains lists.
+    Input: input_list. List of lists.
+    Output: List of unique values found inside input_list
+    """
+    return list(set([item for sublist in input_list for item in sublist]))
 
 
 def sort_strings_by_digit(paths_list):
@@ -33,9 +42,9 @@ def sort_strings_by_digit(paths_list):
     Output: List of sorted strings.
     """
     try:
-        numbers = [str_extract_last_int(i) for i in paths_list]           # Extract integers
-        paths_list = [x for _, x in sorted(zip(numbers, paths_list))]     # Sort input strings_list by integers
-    except IndexError:                                                    # Catch no digits error
+        numbers = [str_extract_last_int(i) for i in paths_list]                  # Extract integers
+        paths_list = [x for _, x in sorted(zip(numbers, paths_list))]            # Sort input strings_list by integers
+    except IndexError:                                                           # Catch no digits error
         print('WARNING: FILES LIST NOT SORTED BY NUMBER')
     return paths_list
 

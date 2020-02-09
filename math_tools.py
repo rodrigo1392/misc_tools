@@ -7,19 +7,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-SI_PHYSICAL_CONSTANTS = {'gravity': 9.80665,  # in m/s2
-                         }
-CONVERSIONS_FACTORS = {'N-kgf': SI_PHYSICAL_CONSTANTS['gravity'],                    # Newton to kgf
-                       'MPa-kgf/cm2': 100 * (1 / SI_PHYSICAL_CONSTANTS['gravity']),  # MPa to kgf/cm2
-                       'kg/m3-kg/cm3': (1 / 1000000),                                # kg/m3 to kg/cm3
-                        }
+SI_CONSTANTS = {'gravity': 9.80665,                                              # in m/s2
+                }
+CONVERSIONS_FACTORS = {'N-kgf': SI_CONSTANTS['gravity'],                         # Newton to kgf
+                       'MPa-kgf/cm2': 100 / SI_CONSTANTS['gravity'],             # MPa to kgf/cm2
+                       'kg/m3-kg/cm3': (1 / 1000000),                            # kg/m3 to kg/cm3
+                       }
 
 
-def unit_convert(quantity, conversion, inverse=0):
-    if not inverse:
+def unit_convert(quantity, conversion, inverse=False):
+    """
+    Convert float from a physical unit to another.
+    Inputs: quantity. Float of value to be converted.
+            conversion. String of CONVERSION_FACTORS dict.
+                        It determines what conversion to execute.
+            inverse. If True, execute inverse conversion.
+    Output: Float of converted value.
+    """
+    if not inverse:                                                              # Execute direct conversion
         return quantity * CONVERSIONS_FACTORS[conversion]
     else:
-        return quantity * (1 / CONVERSIONS_FACTORS[conversion])
+        return quantity * (1 / CONVERSIONS_FACTORS[conversion])                  # Execute inverse conversion
 
 
 def array_1d_consecutiveness_check(array):
@@ -29,21 +37,21 @@ def array_1d_consecutiveness_check(array):
     Output: Tuple of Boolean, True if consecutiveness is OK, False otherwise,
             and Array of missing positions if they exist.
     """
-    array = np.asarray(array)
-    array = array.flatten()
-    n = len(array) - 1
-    fail_positions = np.argwhere(np.diff(sorted(array)) > 1) + 2
-    return sum(np.diff(sorted(array)) == 1) >= n, fail_positions
+    array = np.asarray(array)                                                    # Normalize input to numpy array
+    array = array.flatten()                                                      # Flatten array
+    fail_positions = np.argwhere(np.diff(sorted(array)) > 1) + 2                 # Gather non consecutive values
+    return sum(np.diff(sorted(array)) == 1) >= len(array) - 1, fail_positions
 
 
 def array_extract_unique_sub_arrays(array):
     """
-    Returns the input array without its repeated sub-arrays.
+    Returns the input array without repeated sub-arrays.
     Input: Multidimensional array.
     Output: Multidimensional array with only unique sub-arrays.
     """
-    types = np.dtype((np.void, array.dtype.itemsize * np.prod(array.shape[1:])))  # Deal with data types
-    b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)  # Store array in efficient way
+    types = np.dtype((np.void, array.dtype.itemsize *                            # Deal with data types
+                      np.prod(array.shape[1:])))
+    b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)      # Store array efficiently
     return array[np.unique(b, return_index=True)[1]]
 
 
@@ -56,10 +64,10 @@ def detailed_1d_num_integral(x, y, verbose=False):
             verbose. Optional boolean. If True, print the value of the integral.
     Output: Float value of the integral.
     """
-    integral = np.trapz(x, y)
-    plt.plot(x, y, markersize=5, marker='o')
+    integral = np.trapz(x, y)                                                    # One variable integration
+    plt.plot(x, y, markersize=5, marker='o')                                     # Plot function y=f(x)
     plt.show()
-    if verbose:
+    if verbose:                                                                  # Show numerical value of integral
         print('Integral value:', round(integral, 2))
     return integral
 
@@ -74,12 +82,12 @@ def detailed_1d_interpolator(independent, dependent, plot=True):
     :return:
     """
     from scipy.interpolate import Akima1DInterpolator
-    interpolator = Akima1DInterpolator(independent, dependent)
-    new_independent = np.linspace(np.amin(independent),
+    interpolator = Akima1DInterpolator(independent, dependent)                   # Start interpolator
+    new_independent = np.linspace(np.amin(independent),                          # Re-sample independent variable
                                   np.amax(np.asarray(independent)),
                                   10000)
-    new_dependent = interpolator(new_independent)
-    if plot:
+    new_dependent = interpolator(new_independent)                                # Calculate interpolated values
+    if plot:                                                                     # Plot original and interpolated curves
         from matplotlib import pyplot as plt
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111)
@@ -98,23 +106,23 @@ def detailed_equations_system_solver(variables, equations, replace_values=False)
     Output: dict of solutions for every variable.
     """
     from sympy.solvers.solveset import nonlinsolve, linsolve
-    # Use linear solver if Matrix is present in equation system.
-    # Use the non linear solver otherwise
-    solver = nonlinsolve
-    for eq in equations:
+    solver = nonlinsolve                                                         # Load non linear solver; but if Matrix
+    for eq in equations:                                                         # is present, use linear solver
         if isinstance(eq, sp.Matrix):
             solver = linsolve
             break
-    solution = solver(equations, *variables)
-    solution = {variable: list(solution)[0][pos] for pos, variable in enumerate(variables)}
-    if replace_values:
-        solution = {key: sp.simplify(sympy_recursive_substitution(val, replace_values)) for
+    solution = solver(equations, *variables)                                     # Solve equations
+    solution = {variable: list(solution)[0][pos] for                             # Extract solution expressions
+                pos, variable in enumerate(variables)}
+    sub = sympy_recursive_substitution                                           # Alias long name function
+    if replace_values:                                                           # Replace constants and extract values
+        solution = {key: sp.simplify(sub(val, replace_values)) for
                     key, val in solution.items()}
-    try:
+    try:                                                                         # Try to show solution with Latex,
         from IPython.display import display
         sp.init_printing(use_latex=True, forecolor='White')
         display(solution)
-    except ImportError:
+    except ImportError:                                                          # if not possible, show with ascii
         print(solution)
     return solution
 
@@ -125,15 +133,15 @@ def primes_generator(amount):
     Input: int. Amount of primes to be generated.
     Output: list of primes.
     """
-    output_list = [2]
-    number = 3
-    while len(output_list) < amount:
+    output_list = [2]                                                            # First prime of the list
+    number = 3                                                                   # First prime to test with generator
+    while len(output_list) < amount:                                             # Generate primes
         primeness = True
-        for num in range(2, int(number ** 0.5) + 1):
+        for num in range(2, int(number ** 0.5) + 1):                             # Test primeness
             if number % num == 0:
                 primeness = False
                 break
-        if primeness:
+        if primeness:                                                            # If prime, append number to list
             output_list.append(number)
         number += 1
     return output_list
@@ -144,13 +152,13 @@ def primes_upto(limit):
     Generates all primes up to n.
     Input: int. Max limit of primes to be output.
     Output: list of primes less than or equal to limit."""
-    limit = limit + 1
+    limit = limit + 1                                                            # Move up python limit for generator
     prime = [True] * limit
-    for number in range(2, limit):
+    for number in range(2, limit):                                               # Generate natural numbers list
         if prime[number]:
-            yield number  # n is a prime
+            yield number                                                         # Catch prime number
             for c in range(number * number, limit, number):
-                prime[c] = False  # mark composites
+                prime[c] = False                                                 # Mark composite numbers
 
 
 def round_up_n(x, base=5):
@@ -182,10 +190,10 @@ def sympy_recursive_substitution(expression, substitute_dict):
     Output: Evaluated algebraic expression.
     """
     for _ in range(0, len(substitute_dict) + 1):
-        new_expr = expression.subs(substitute_dict)
-        if new_expr == expression:
+        new_expr = expression.subs(substitute_dict)                              # Attempt a symbol eval
+        if new_expr == expression:                                               # Check if final expression changes
             return new_expr
-        else:
+        else:                                                                    # Return when no more changes occur
             expression = new_expr
     return
 

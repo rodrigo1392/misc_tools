@@ -2,6 +2,7 @@
     Developed by Rodrigo Rivero.
     https://github.com/rodrigo1392"""
 
+# Flexibility for python 2.x
 try:
     import configparser
 except ImportError:
@@ -10,12 +11,12 @@ try:
     from pathlib import Path
 except ImportError:
     pass
+from .strings_tools import sort_strings_by_digit, str_extract_last_int
 import numpy as np
 import os
 import re
 import shutil
 import sys
-from .strings_tools import sort_strings_by_digit, str_extract_last_int
 
 
 def check_corrupted_videos(root_path, extensions):
@@ -25,40 +26,40 @@ def check_corrupted_videos(root_path, extensions):
             extensions. List of file extensions to look for.
     Output: Tuple of amount of good and bad files.
     """
-    try:
-        import cv2  # https://pypi.python.org/pypi/opencv-python
+    try:                                                                         # Import cv2 package
+        import cv2
     except ImportError:
         sys.exit('NO CV2 MODULE FOUND')
-    try:
+    try:                                                                         # Import tqdm for fancy progress bar
         import tqdm
         progress_bar = True
     except ImportError:
         print('No tqdm module found. Progress bar will not be shown')
         progress_bar = False
         pass
-    print("Python version:", sys.version)           # Print Python and CV info
+    print("Python version:", sys.version)                                        # Print Python and CV info
     print("CV2:   ", cv2.__version__)
-    files_paths = []                                # Gather paths of video files
+    files_paths = []                                                             # Gather paths of video files
     for extension in extensions:
         files_paths.extend(files_with_extension_lister(root_path, extension))
-    if progress_bar:                                # Prepare list for progress bar
+    if progress_bar:                                                             # Prepare list for progress bar
         files_paths = tqdm.tqdm(files_paths)
-    good_files_counter = 0                          # Process files
+    good_files_counter = 0                                                       # Process files
     for filename in files_paths:
-        try:
+        try:                                                                     # Try to open video file
             vid = cv2.VideoCapture(filename)
             if not vid.isOpened():
                 print('FILE NOT FOUND:' + filename)
                 raise NameError('File not found')
-        except cv2.error:
+        except cv2.error:                                                        # Catch bad video files
             print('error:' + filename)
             print("cv2.error:")
-        except Exception as e:
+        except Exception as e:                                                   # Catch other errors
             print("Exception:", e)
             print('error:' + filename)
-        else:
+        else:                                                                    # Count good video files
             good_files_counter += 1
-    print("Good files:", good_files_counter)        # Output messages
+    print("Good files:", good_files_counter)                                     # Print output messages
     print("Bad files:", len(files_paths) - good_files_counter)
     return good_files_counter, len(files_paths) - good_files_counter
 
@@ -70,22 +71,21 @@ def config_file_extract_input(config_file):
            number of sections and variables.
     Output: Dict of input variable name: value pairs.
     """
-    cfg = configparser.ConfigParser()
-    cfg.read(config_file)
-    # EXTRACT AND PROCESS INPUT DATA
-    input_data = ({k.lower(): eval(repr(v)) for k, v in cfg.items(i)}
-                  for i in cfg.sections())                      # Generate output for all sections
+    cfg = configparser.ConfigParser()                                            # Start parser engine
+    cfg.read(config_file)                                                        # Read config file
+    input_data = ({k.lower(): eval(repr(v)) for k, v in cfg.items(i)}            # Gather all input variables
+                  for i in cfg.sections())
     input_data = {k: (None if v is '0' else v)
-                  for i in input_data for k, v in i.items()}                      # Merge input data in one dict
+                  for i in input_data for k, v in i.items()}                     # Merge input data in one dict
     output_data = {}
-    for k, v in input_data.items():         # Attempt to convert input strings into Python objects
+    for k, v in input_data.items():                                              # Try to convert vars to Python objects
         try:
             output_data[k] = eval(v)
         except SyntaxError:
             output_data[k] = v
         except TypeError:
             output_data[k] = v
-        except:
+        except:                                                                  # Do not convert if exception is raised
             output_data[k] = v
     return output_data
 
@@ -99,9 +99,9 @@ def file_finder(root_path, searched_file, sub_folders_option=False):
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders
     Output: Full path(s) of searched file.
     """
-    paths_list = files_lister(root_path, True, sub_folders_option)
-    file_path = [i for i in paths_list if str(i.name) == searched_file]
-    if not file_path:
+    paths_list = files_lister(root_path, True, sub_folders_option)               # List all files in root
+    file_path = [i for i in paths_list if str(i.name) == searched_file]          # Extract searched file path from list
+    if not file_path:                                                            # Return False if file not found
         print('File not found')
         return False
     return file_path
@@ -113,9 +113,10 @@ def file_renumber(file_path, delta):
     Input: file_path. Path of file to be renamed.
            delta. Int of number to be added.
     """
-    file_path = Path(file_path)                                                       # Normalize input to Path object
-    number = str_extract_last_int(file_path)                                          # Find numbers in original names.
-    file_path.rename(Path(str(file_path).replace(str(number), str(number + delta))))  # Rename file
+    file_path = Path(file_path)                                                  # Normalize input to Path object
+    number = str_extract_last_int(file_path)                                     # Find numbers in original path
+    file_path.rename(Path(str(file_path).replace(str(number),                    # Rename file with new number
+                                                 str(number + delta))))
     return
 
 
@@ -125,13 +126,14 @@ def file_save_with_old_version(file_path):
     Input: file_path. Path of file to be saved.
     """
     file_path = Path(file_path)
-    base_version_file = Path(str(file_path).replace(file_path.name, 'old_' + file_path.name))  # Old version file Path
-    if base_version_file.exists():                                               # Return old version of file as current
-        shutil.copy(str(base_version_file), str(file_path))
-        return file_path
-    elif Path(file_path).exists():                                               # If not old file is found, create it
-        shutil.copy(file_path, base_version_file)
-        return file_path
+    base_version_file = Path(str(file_path).replace(file_path.name,              # Old version file path
+                                                    'old_' + file_path.name))
+    if base_version_file.exists():                                               # If old version exists:
+        shutil.copy(str(base_version_file), str(file_path))                      # create a copy without 'old' prefix
+        return file_path                                                         # return path of current version
+    elif Path(file_path).exists():                                               # If not old version does not exists:
+        shutil.copy(file_path, base_version_file)                                # create a copy with 'old' prefix
+        return file_path                                                         # return path of current version
     else:
         print(Path(file_path).name, 'FILE NOT FOUND IN', str(file_path.parent))  # Report if no file was found
         return None
@@ -146,9 +148,9 @@ def files_in_folder_2txt(root_path, out_file_path=None, full_name_option=False, 
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     """
     if not out_file_path:
-        out_file_path = Path(root_path, 'files_list')                           # Assign output file if none provided
-    paths_list = files_lister(root_path, full_name_option, sub_folders_option)  # List files in root
-    with open(Path(out_file_path).with_suffix('.txt'), 'w+') as file_out:       # Normalize output file suffix and write
+        out_file_path = Path(root_path, 'files_list')                            # Set default output file
+    paths_list = files_lister(root_path, full_name_option, sub_folders_option)   # List files in root
+    with open(Path(out_file_path).with_suffix('.txt'), 'w+') as file_out:        # Normalize output file suffix and save
         file_out.write('\n'.join(paths_list))
     return out_file_path
 
@@ -161,15 +163,15 @@ def files_lister(root_path, full_name_option=True, sub_folders_option=True):
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     Output: List of all existing files.
     """
-    root_path = Path(root_path)                                         # Normalize input to Path object
-    if not sub_folders_option:
-        paths_list = [f for f in root_path.iterdir() if f.is_file()]    # Get files list
-    else:
+    root_path = Path(root_path)                                                  # Normalize input to Path object
+    if not sub_folders_option:                                                   # List files without recursion or,
+        paths_list = [f for f in root_path.iterdir() if f.is_file()]
+    else:                                                                        # List files with recursion
         paths_list = [f for f in root_path.rglob("*") if f.is_file()]
-    if not full_name_option:                                            # Extract only names if necessary
+    if not full_name_option:                                                     # Optionally remove parent directories
         paths_list = [f.name for f in paths_list]
     try:
-        return sort_strings_by_digit(paths_list)                        # Try to sort files by digits
+        return sort_strings_by_digit(paths_list)                                 # Try to sort files by digits
     except IndexError:
         return paths_list
 
@@ -183,8 +185,9 @@ def files_with_extension_lister(root_path, extension, full_name_option=True, sub
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     Output: List of Path objects.
     """
-    paths_list = files_lister(root_path, full_name_option, sub_folders_option)            # List all files in root
-    paths_list = [i for i in paths_list if i.suffix == '.' + extension.replace('.', '')]  # Filter by extension
+    paths_list = files_lister(root_path, full_name_option, sub_folders_option)   # List files in root
+    paths_list = [i for i in paths_list if                                       # Filter files by extension
+                  i.suffix == '.' + extension.replace('.', '')]
     return paths_list
 
 
@@ -197,8 +200,8 @@ def files_with_name_lister(root_path, input_string, full_name_option=True, sub_f
             sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
     Output: List of Path objects.
     """
-    paths_list = files_lister(root_path, full_name_option, sub_folders_option)    # List all files in root
-    paths_list = [i for i in paths_list if input_string in i.name]                # Filter by substring
+    paths_list = files_lister(root_path, full_name_option, sub_folders_option)   # List all files in root
+    paths_list = [i for i in paths_list if input_string in i.name]               # Filter files by substring
     return paths_list
 
 
@@ -207,12 +210,12 @@ def folder_create_if_not(folder_path):
     Creates folder if it does not exist.
     Input: folder_path. Path of folder to be verified/created.
     """
-    folder_path = Path(folder_path)                 # Normalize input to Path object
+    folder_path = Path(folder_path)                                              # Normalize input to Path object
     try:
-        folder_path.mkdir()                         # Attempt to create folder
+        folder_path.mkdir()                                                      # Attempt to create folder
         print(str(folder_path), 'folder created')
         return folder_path
-    except FileExistsError:                         # If it already exists, do nothing
+    except FileExistsError:                                                      # If it already exists, do nothing
         return folder_path
 
 
@@ -224,8 +227,8 @@ def folder_size(root_path=None, sub_folders_option=True):
     """
     if not root_path:
         root_path = Path.cwd()
-    paths_list = files_lister(root_path, True, sub_folders_option)            # List all files in root
-    return round(sum(f.stat().st_size for f in paths_list) / (1024*1024), 3)  # Size in MB
+    paths_list = files_lister(root_path, True, sub_folders_option)               # List files in root
+    return round(sum(f.stat().st_size for f in paths_list) / (1024*1024), 3)     # Return sum of file sizes in MB
 
 
 def folder_walk_level(root_path, level=1):

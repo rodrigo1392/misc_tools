@@ -2,11 +2,9 @@
     Developed by Rodrigo Rivero.
     https://github.com/rodrigo1392"""
 
+from .math_tools import primes_generator
 import math
-
 import numpy as np
-
-from math_tools import primes_generator
 
 
 def coded2data(c, limits):
@@ -16,7 +14,7 @@ def coded2data(c, limits):
             limits. Tuple of the real scale maximum and minimum limits of the parameter.
     Outputs: Float of real value.
     """
-    x_max, x_min = max(limits), min(limits)
+    x_max, x_min = max(limits), min(limits)                                      # Extract limits from tuple
     return ((c + 1) * (x_max - x_min) * 0.5) + x_min
 
 
@@ -27,7 +25,7 @@ def data2coded(x, limits):
             limits. Tuple of the real scale maximum and minimum limits of the parameter.
     Outputs Float of coded value.
     """
-    x_max, x_min = max(limits), min(limits)
+    x_max, x_min = max(limits), min(limits)                                      # Extract limits from tuple
     return (2 * (x - x_min) / (x_max - x_min)) - 1
 
 
@@ -37,8 +35,8 @@ def empirical_cdf(vector):
     Input: vector. Array of empirical data.
     Output: tuple of sorted input data, empirical CDF.
     """
-    xs = np.sort(vector)
-    ys = np.arange(1, len(xs) + 1) / float(len(xs))
+    xs = np.sort(vector)                                                         # Sort vector values
+    ys = np.arange(1, len(xs) + 1) / float(len(xs))                              # Calculate accumulated percentages
     return xs, ys
 
 
@@ -48,11 +46,11 @@ def factorial_combination(factors_list):
     Input: factors. List containing strings to be factorial combined.
     Output: List of factorial combinations.
     """
-    if not isinstance(factors_list, list):
+    if not isinstance(factors_list, list):                                       # Normalize input to list
         factors_list = [factors_list]
     lk = []
     length = len(factors_list)
-    for i, element in enumerate(factors_list):
+    for i, element in enumerate(factors_list):                                   # Generate factorial combinator
         if i != length - 1:
             for k in range(i + 1, length):
                 lk.append([element, factors_list[k]])
