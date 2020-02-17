@@ -5,90 +5,260 @@
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.interpolate import Akima1DInterpolator
+from sympy.solvers.solveset import nonlinsolve, linsolve
 
-
-SI_CONSTANTS = {'gravity': 9.80665,                                              # in m/s2
+SI_CONSTANTS = {'gravity': 9.80665,  # in m/s2
                 }
-CONVERSIONS_FACTORS = {'N-kgf': SI_CONSTANTS['gravity'],                         # Newton to kgf
-                       'MPa-kgf/cm2': 100 / SI_CONSTANTS['gravity'],             # MPa to kgf/cm2
-                       'kg/m3-kg/cm3': (1 / 1000000),                            # kg/m3 to kg/cm3
-                       }
+CONVERT_FACTORS = {'N-kgf': SI_CONSTANTS['gravity'],  # N to kgf
+                   'MPa-kgf/cm2':
+                       100 / SI_CONSTANTS['gravity'],  # MPa to kgf/cm2
+                   'kg/m3-kg/cm3': (1 / 1000000),  # kg/m3 to kg/cm3
+                   }
 
 
-def unit_convert(quantity, conversion, inverse=False):
+def check_array_consecutiveness(array_like):
+    """Check consecutiveness of elements values in a array.
+
+    Parameters
+    ----------
+    array_like : numpy array or similar convertible to it
+        Input array to be flattened and check for elements values
+        consecutiveness.
+
+    Returns
+    -------
+    Boolean
+        True if all elements values are consecutive, False otherwise.
+    numpy array
+        Positions of not consecutive elements
+
+    Raises
+    ------
+    AssertionError
+        Not numeric data in `array_like`.
     """
-    Convert float from a physical unit to another.
-    Inputs: quantity. Float of value to be converted.
-            conversion. String of CONVERSION_FACTORS dict.
-                        It determines what conversion to execute.
-            inverse. If True, execute inverse conversion.
-    Output: Float of converted value.
+    # Normalize input to numpy array object and flatten it.
+    array = np.asarray(array_like)
+    array = array.flatten()
+    assert not array.dtype.kind in {'U', 'S'}, \
+        'Array should contain numeric data only'
+
+    # Check for not consecutive values and gather their positions.
+    array_diff = np.diff(sorted(array))
+    bool_consecutiveness = sum(array_diff == 1) >= len(array) - 1
+    fail_positions = np.argwhere(np.diff(sorted(array)) > 1) + 2
+    return bool_consecutiveness, fail_positions
+
+
+def convert_units(quantity, conversion, inverse=False):
+    """Convert float from a physical unit to another.
+
+    Parameters
+    ----------
+    quantity : float
+        Physical magnitude value to be converted.
+    conversion : string from `CONVERT_FACTORS` dictionary
+        Determines from and to which measurement unit to convert.
+    inverse : Boolean
+        If True, perform the inverse conversion. Default is False.
+
+    Returns
+    -------
+    float
+        Physical quantity in new measure unit.
+
+    Raises
+    ------
+    AssertionError
+        Conversion factor not established `CONVERT_FACTORS` dictionary.
     """
-    if not inverse:                                                              # Execute direct conversion
-        return quantity * CONVERSIONS_FACTORS[conversion]
+    assert conversion in CONVERT_FACTORS.keys(), 'Conversion factor not defined'
+
+    if not inverse:
+        return quantity * CONVERT_FACTORS[conversion]
     else:
-        return quantity * (1 / CONVERSIONS_FACTORS[conversion])                  # Execute inverse conversion
+        return quantity * (1 / CONVERT_FACTORS[conversion])
 
 
-def array_1d_consecutiveness_check(array):
+def eval_sympy(expression, substitute_dict):
+    """Substitute numeric values into sympy expressions recursively.
+
+    Parameters
+    ----------
+    expression : sympy object
+        Algebraic expression.
+    substitute_dict: dict
+        Variable name:value pairs to substitute from.
+
+    Returns
+    -------
+    sympy object
+        Evaluated algebraic expression.
     """
-    Check for consecutiveness of elements of mono-dimensional array.
-    Input: Mono-dimensional array.
-    Output: Tuple of Boolean, True if consecutiveness is OK, False otherwise,
-            and Array of missing positions if they exist.
-    """
-    array = np.asarray(array)                                                    # Normalize input to numpy array
-    array = array.flatten()                                                      # Flatten array
-    fail_positions = np.argwhere(np.diff(sorted(array)) > 1) + 2                 # Gather non consecutive values
-    return sum(np.diff(sorted(array)) == 1) >= len(array) - 1, fail_positions
+    # Attempt a symbolic eval, check for expression changes, return when
+    # no more changes occur
+    for _ in range(0, len(substitute_dict) + 1):
+        new_expr = expression.subs(substitute_dict)
+        if new_expr == expression:
+            return new_expr
+        else:
+            expression = new_expr
 
 
-def array_extract_unique_sub_arrays(array):
+def extract_unique_sub_arrays(array_like):
+    """Filter out repeated sub-arrays in multidimensional array.
+
+    Parameters
+    ----------
+    array_like : numpy array or similar convertible to it
+        Input array to be filtered.
+
+    Returns
+    -------
+    numpy array
+        Input array with unique sub-arrays.
+
+    Raises
+    ------
+    AssertionError
+        Input `array_like` does not contain any sub-arrays.
     """
-    Returns the input array without repeated sub-arrays.
-    Input: Multidimensional array.
-    Output: Multidimensional array with only unique sub-arrays.
-    """
-    types = np.dtype((np.void, array.dtype.itemsize *                            # Deal with data types
-                      np.prod(array.shape[1:])))
-    b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)      # Store array efficiently
+    # Normalize input to numpy array object.
+    array = np.asarray(array_like)
+    assert array.ndim >= 2, 'Array should be mulidimensional'
+
+    # Deal with data types, store array efficiently and filter unique
+    types = np.dtype((np.void, array.dtype.itemsize * np.prod(array.shape[1:])))
+    b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)
     return array[np.unique(b, return_index=True)[1]]
 
 
-def detailed_1d_num_integral(x, y, verbose=False):
+def generate_primes(amount):
+    """Generate first n primes.
+
+    Parameters
+    ----------
+    amount : int
+        Amount of prime numbers to generate.
+
+    Returns
+    -------
+    list
+        Prime numbers.
     """
-    Calculates the numerical integral value of y(x), between the limits given by the x array domain.
-    Plots the function for more comprehension.
-    Inputs: x. Array of independent variable values.
-            y. Array of dependent variable values.
-            verbose. Optional boolean. If True, print the value of the integral.
-    Output: Float value of the integral.
+    # Set first prime and first candidate for generator
+    output_list = [2]
+    number = 3
+
+    # Generate candidates, test primeness and append them if positive
+    while len(output_list) < amount:
+        primeness = True
+        for num in range(2, int(number ** 0.5) + 1):
+            if number % num == 0:
+                primeness = False
+                break
+        if primeness:
+            output_list.append(number)
+        number += 1
+    return output_list
+
+
+def generate_primes_to(limit):
+    """Generate all prime numbers, up to a given number.
+
+    Parameters
+    ----------
+    limit : int
+        Upper limit of generated primes.
+
+    Returns
+    -------
+    list
+        Prime numbers.
     """
-    integral = np.trapz(x, y)                                                    # One variable integration
-    plt.plot(x, y, markersize=5, marker='o')                                     # Plot function y=f(x)
+    # Move up python limit for generator
+    limit = limit + 1
+
+    # Generate candidates, try for and mark composites numbers
+    prime = [True] * limit
+    for number in range(2, limit):
+        if prime[number]:
+            yield number
+            for c in range(number * number, limit, number):
+                prime[c] = False
+
+
+def integrate_num_2d(independent, dependent, verbose=False):
+    """Calculate and plot numerical integral of a one variable function.
+
+    Plot the curve corresponding to the function. Limits of the integral
+    are given by `independent` domain.
+
+    Parameters
+    ----------
+    independent : numpy array
+        Independent variable values.
+    dependent : numpy array
+        Dependent variable values.
+    verbose : bool, optional
+        If True, print integral value. Default is False.
+
+    Returns
+    -------
+    float
+        Value of numeric integral.
+
+    Raises
+    ------
+    AssertionError
+        `independent` and `dependent` arrays have different dimensions.
+    """
+    assert independent.shape == dependent.shape,\
+        'Independent and dependent variables values arrays should be consistent'
+    integral = np.trapz(independent, dependent)
+    plt.plot(independent, dependent, markersize=5, marker='o')
     plt.show()
-    if verbose:                                                                  # Show numerical value of integral
+    if verbose:
         print('Integral value:', round(integral, 2))
     return integral
 
 
-def detailed_1d_interpolator(independent, dependent, plot=True):
+def interpolate_2d(independent, dependent, plot=True):
+    """Interpolate a one variable function with the Akima algorithm.
+
+    Parameters
+    ----------
+    independent : numpy array
+        Independent variable values.
+    dependent : numpy array
+        Dependent variable values.
+    plot : bool, optional
+        If True, plot original vs interpolated curves. Default is False.
+
+    Returns
+    -------
+    numpy array
+        Interpolated independent values.
+    numpy array
+        Interpolated dependent values.
+
+    Raises
+    ------
+    AssertionError
+        `x` and `y` arrays have different dimensions.
     """
-    Interpolates a 1 variable function, with the Akima algorithm.
-    Inputs: independent. Array of independent variable values.
-            dependent. Array of dependent variable values.
-            plot. If True, presents original vs interpolated curves.
-    Output: Tuple of arrays of interpolated independent and dependent values.
-    :return:
-    """
-    from scipy.interpolate import Akima1DInterpolator
-    interpolator = Akima1DInterpolator(independent, dependent)                   # Start interpolator
-    new_independent = np.linspace(np.amin(independent),                          # Re-sample independent variable
+    assert independent.shape == dependent.shape,\
+        'Independent and dependent variables values arrays should be consistent'
+
+    # Start interpolator, re-sample independent values, calculate
+    # interpolated dependent values
+    interpolator = Akima1DInterpolator(independent, dependent)
+    new_independent = np.linspace(np.amin(independent),
                                   np.amax(np.asarray(independent)),
                                   10000)
-    new_dependent = interpolator(new_independent)                                # Calculate interpolated values
-    if plot:                                                                     # Plot original and interpolated curves
-        from matplotlib import pyplot as plt
+    new_dependent = interpolator(new_independent)
+    if plot:
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111)
         ax.plot(independent, dependent, marker='o')
@@ -97,121 +267,127 @@ def detailed_1d_interpolator(independent, dependent, plot=True):
     return new_independent, new_dependent
 
 
-def detailed_equations_system_solver(variables, equations, replace_values=False):
-    """
-    Solves system of equations using sympy library.
-    Inputs: variables. List of independent variables to be solve for.
-            equations. List of sympy equation objects.
-            replace_values. If not False, substitute variables for given values in dict form.
-    Output: dict of solutions for every variable.
-    """
-    from sympy.solvers.solveset import nonlinsolve, linsolve
-    solver = nonlinsolve                                                         # Load non linear solver; but if Matrix
-    for eq in equations:                                                         # is present, use linear solver
-        if isinstance(eq, sp.Matrix):
-            solver = linsolve
-            break
-    solution = solver(equations, *variables)                                     # Solve equations
-    solution = {variable: list(solution)[0][pos] for                             # Extract solution expressions
-                pos, variable in enumerate(variables)}
-    sub = sympy_recursive_substitution                                           # Alias long name function
-    if replace_values:                                                           # Replace constants and extract values
-        solution = {key: sp.simplify(sub(val, replace_values)) for
-                    key, val in solution.items()}
-    try:                                                                         # Try to show solution with Latex,
-        from IPython.display import display
-        sp.init_printing(use_latex=True, forecolor='White')
-        display(solution)
-    except ImportError:                                                          # if not possible, show with ascii
-        print(solution)
-    return solution
-
-
-def primes_generator(amount):
-    """
-    Generates first n primes.
-    Input: int. Amount of primes to be generated.
-    Output: list of primes.
-    """
-    output_list = [2]                                                            # First prime of the list
-    number = 3                                                                   # First prime to test with generator
-    while len(output_list) < amount:                                             # Generate primes
-        primeness = True
-        for num in range(2, int(number ** 0.5) + 1):                             # Test primeness
-            if number % num == 0:
-                primeness = False
-                break
-        if primeness:                                                            # If prime, append number to list
-            output_list.append(number)
-        number += 1
-    return output_list
-
-
-def primes_upto(limit):
-    """
-    Generates all primes up to n.
-    Input: int. Max limit of primes to be output.
-    Output: list of primes less than or equal to limit."""
-    limit = limit + 1                                                            # Move up python limit for generator
-    prime = [True] * limit
-    for number in range(2, limit):                                               # Generate natural numbers list
-        if prime[number]:
-            yield number                                                         # Catch prime number
-            for c in range(number * number, limit, number):
-                prime[c] = False                                                 # Mark composite numbers
-
-
-def round_up_n(x, base=5):
-    """
-    Rounds up a float to an integer multiple of base.
-    Inputs: x. Float to round up.
-            base. Multiple of which to round up to.
-    Output: Int of rounded number.
-    """
-    return int(math.ceil(x / base)) * base
-
-
-def round_down_n(x, base=5):
-    """
-    Rounds down a float to an integer multiple of base.
-    Inputs: x. Float to round up.
-            base. Multiple of which to round up to.
-    Output: Int of rounded number.
-    """
-    return int(math.floor(x / base)) * base
-
-
-def sympy_recursive_substitution(expression, substitute_dict):
-    """
-    Recursively substitutes values into sympy expressions.
-    They can be numbers or other algebraic expressions.
-    Inputs: expression. Sympy algebraic expression.
-            substitute_dict. Dict of variable:value pairs.
-    Output: Evaluated algebraic expression.
-    """
-    for _ in range(0, len(substitute_dict) + 1):
-        new_expr = expression.subs(substitute_dict)                              # Attempt a symbol eval
-        if new_expr == expression:                                               # Check if final expression changes
-            return new_expr
-        else:                                                                    # Return when no more changes occur
-            expression = new_expr
-    return
-
-
 def ishigami_eq(x1, x2, x3):
-    """
-    The Ishigami function of Ishigami & Homma (1990) is used as an example for uncertainty and sensitivity
-    analysis methods, because it exhibits strong non-linearity and no-monotonicity. It also has a peculiar dependence
-    on x3, as described by Sobol & Levitan (1999).
+    """Mathematical Ishigami function of three variables.
+
+    Parameters
+    ----------
+    x1, x2, x3 : numpy arrays
+        Input independent variables.
+
+    Returns
+    -------
+    numpy array
+        Dependent variable.
+
+    Notes
+    -------
+    The Ishigami function of Ishigami & Homma (1990) is used as a test
+    for uncertainty and sensitivity analysis methods, because it
+    exhibits strong non-linearity and no-monotonicity.
+    It also has a peculiar dependence on x3, as described by Sobol
+    & Levitan (1999).
     """
     return np.sin(x1) + 7 * np.sin(x2) ** 2 + 0.1 * x3 ** 4 * np.sin(x1)
 
 
-def white_noise_generator(mean, std, num_samples):
+def round_down_n(input_f, base=5):
+    """Round down a float to a multiple of a given number.
+
+    Parameters
+    ----------
+    input_f : float
+        Value to be rounded.
+    base: int
+        Multiple of which to round down to.
+
+    Returns
+    -------
+    int
+        Rounded number.
     """
-    Generates normalized random values.
-    Inputs: mean. Mean of the output array.
-            std. Standard deviation of the output array.
-    Output: Array of random values.
+    return int(math.floor(input_f / base)) * base
+
+
+def round_up_n(input_f, base=5):
+    """Round up a float to a multiple of a given number.
+
+    Parameters
+    ----------
+    input_f : float
+        Value to be rounded.
+    base: int
+        Multiple of which to round up to.
+
+    Returns
+    -------
+    int
+        Rounded number.
+    """
+    return int(math.ceil(input_f / base)) * base
+
+
+def solve_equations_system(variables, equations, replace_values=None):
+    """Solve linear and non linear equations system using Sympy library.
+
+    Parameters
+    ----------
+    variables : list of str
+        Name of independent variable to solve for.
+    equations : list of sympy equations objects
+        Conform the equations system.
+    replace_values : dict, optional
+        If given, substitute variables for numeric values established
+        in dict, as variable name:value pairs. Default is None
+
+    Returns
+    -------
+    dict
+        Variable name: Solution value pairs.
+    """
+    # If a Matrix is present in the system, use linear solver;
+    # otherwise, load a non linear solver.
+    solver = nonlinsolve
+    for eq in equations:
+        if isinstance(eq, sp.Matrix):
+            solver = linsolve
+            break
+
+    # Solve equations and extract solutions
+    solution = solver(equations, *variables)
+    solution = {variable: list(solution)[0][pos] for
+                pos, variable in enumerate(variables)}
+
+    # Replace constants and extract values
+    if replace_values is not None:
+        solution = {key: sp.simplify(eval_sympy(val, replace_values)) for
+                    key, val in solution.items()}
+
+    # Try to show solution with Latex, use ascii if not possible
+    try:
+        from IPython.display import display
+        sp.init_printing(use_latex=True, forecolor='White')
+        display(solution)
+    except ImportError:
+        print(solution)
+    return solution
+
+
+def white_noise_generator(mean, std, num_samples):
+    """Generate normalized random values.
+
+    Parameters
+    ----------
+    mean : float
+        Mean of output samples.
+    std : float
+        Standard deviation of output samples.
+    num_samples : int
+        Amount of output samples.
+
+    Returns
+    -------
+    numpy array
+        Numeric samples.
     """
     return np.random.normal(mean, std, size=num_samples)
