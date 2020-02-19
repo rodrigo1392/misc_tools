@@ -1,126 +1,258 @@
-""" Functions to be used by a Python 3 interpreter.
-    Developed by Rodrigo Rivero.
-    https://github.com/rodrigo1392"""
+"""Functions to manage pandas and hdf5 databases.
 
+Intended to be used within a Python 3 environment.
+Developed by Rodrigo Rivero.
+https://github.com/rodrigo1392
+
+"""
 
 # Flexibility for python 2.x
 try:
     from pathlib import Path
 except ImportError:
     pass
-from .strings_tools import list_of_lists_unique
+
 import h5py
 import numpy as np
-import os
 import pandas as pd
 
+from . import strings_tools as st
+from . import filesystem_tools as ft
 
-def dataframe_safe_save(data_frame, output_csv, overwrite_csv=False):
+
+def get_hdf5_first_level_structure(hdf5_path):
+    """Extract hdf5 first level groups keys and data-sets attributes.
+
+    Parameters
+    ----------
+    hdf5_path : Path
+        Hdf5 file to be investigated.
+
+    Returns
+    -------
+    List of str
+        Keys of first level groups.
+    List of str
+        Attributes names of first level data-sets.
     """
-    Saves a pandas dataframe to a csv, avoiding non intentional overwriting.
-    Inputs: data_frame. Pandas Dataframe to be saved.
-            output_csv. Path of output csv.
-            overwrite_csv. Boolean, if True, overwrite output file.
-            Do nothing otherwise.
+    # Open hdf5 file and iterate over first level groups.
+    #
+    # Retrieve list of groups keys and list of first level data-sets
+    # attributes separately.
+    with h5py.File(hdf5_path, 'r') as db_file:
+        gu = st.get_uniques_in_list_of_lists
+        m_keys = [i for i in db_file.keys()]
+        m_attrs = gu([list(b.attrs) for v in db_file.values()
+                      for b in v.values()])
+    return m_keys, m_attrs
+
+
+def reformat_peer_data_csv(csv_file_path, time_step=0.005):
+    """Reformat PEER motion records to column-wise, and save to csv.
+
+    Typically, PEER data is given in a plane text file, with data
+    disposed in horizontal consecutive arrays. This function serializes
+    it in a single column and returns the new data frame in a csv file.
+
+    Parameters
+    ----------
+    csv_file_path : Path
+        Csv file to load data from.
+    time_step : float
+        Time step of record. Needs to be set to create time column.
+
+    Returns
+    -------
+    Path
+        Path of corrected cdv file.
     """
-    output_csv = Path(output_csv).with_suffix('.csv')                            # Normalize csv file path
-    if output_csv.exists():                                                      # Check: if csv file exists, and
+    # Normalize input as Path object and read csv file.
+    csv_file_path = Path(csv_file_path).with_suffix('.csv')
+    df = pd.read_csv(csv_file_path, header=None)
+
+    # Transpose data for handling. Extract it column-wise in new df.
+    df_trans = df.transpose()
+    column = [df_trans[i] for i in df_trans]
+    combined = pd.concat(column, ignore_index=True)
+
+    # Create new data-frame and add time column.
+    df_out = pd.DataFrame()
+    df_out['T'] = np.arange(0, time_step * (len(combined) - 2), time_step)
+    df_out['DATA'] = combined
+
+    # Save corrected csv file in new csv file.
+    output_path = ft.modify_filename_in_path(csv_file_path,
+                                             added='_corrected', prefix=False)
+    df_out.to_csv(output_path, index=False)
+    return output_path
+
+
+def restructure_hdf5_file(hdf5_path, common_sub_groups=None, output_path=None,
+                          verbose=False):
+    """Reorder hdf5 using common first level subgroups as root groups.
+
+    This function reorganizes hdf5 internal structure, using common
+    first level subgroups keys as first level groups keys. This allows
+    to regroup outputs from different models under one group for each
+    output variable.
+
+    If there are M root groups (corresponding to M models, from M npz
+    files) and V output variables, input hdf5 should have M root level
+    groups, each of them containing V data sets. This algorithm swaps
+    those categories. Therefore, output hdf5  should have V root level
+    groups with M data_sets each.
+
+    Attributes are copy from each original group to corresponding
+    output data_sets.
+
+    Parameters
+    ----------
+    hdf5_path : Path
+        Hdf5 file to be restructured.
+    common_sub_groups : list of str, optional
+        Names of first level subgroups keys to use as root groups. If
+        not provided, algorithm find and uses all common subgroup keys.
+    output_path : Path
+        Path of output hdf5 file.
+    verbose : bool, optional
+        If True, print output hdf5 structure. Default is False.
+
+    Returns
+    -------
+    output_path : Path
+        Path of output hdf5 file.
+    """
+    # Set default output file path.
+    hd = hdf5_path
+    if not output_path:
+        output_path = Path(hd.parent,
+                           str(hd.name).replace(hd.stem, str(hd.stem + '_tr')))
+
+    # Open input hdf5 and set all keys as default groups keys.
+    with h5py.File(hd, 'r') as db_file:
+        if not common_sub_groups:
+            get_unique = st.get_uniques_in_list_of_lists
+            common_sub_groups = get_unique([v.keys() for v in db_file.values()])
+
+        # Open output hdf5 file and iterate trough original data-sets,
+        # swapping groups names with data, including groups attributes.
+        with h5py.File(output_path, 'w') as out:
+            for key in common_sub_groups:
+                out_grp = out.create_group(key)
+                for group_n, group in db_file.items():
+                    ds = out_grp.create_dataset(group_n, data=group[key])
+                    ds.attrs.update(group.attrs)
+
+            # Print output file structure
+            if verbose:
+                show_hdf5_structure(out)
+    return output_path
+
+
+def save_dataframe_safely(data_frame, output_csv, overwrite=False):
+    """Save pandas dataframe as csv, avoiding accidental overwriting.
+
+    Parameters
+    ----------
+    data_frame : pandas DataFrame
+        To be saved as csv.
+    output_csv : Path
+        Path of output csv file.
+    overwrite : bool, optional
+        If True, allow overwrite of output file.
+
+    Returns
+    -------
+    None
+    """
+    # Normalize csv file path.
+    output_csv = Path(output_csv).with_suffix('.csv')
+
+    # Check output file existence.
+    if output_csv.exists():
         print('WARNING: CSV FILE EXISTS')
-        if overwrite_csv:                                                        # Overwrite is True
-            data_frame.to_csv(output_csv, index=False, mode='w+')                # Save file
+
+        # Overwrite if it is allowed.
+        if overwrite:
+            data_frame.to_csv(output_csv, index=False, mode='w+')
             print(Path(output_csv).stem, 'CSV FILE OVERWRITTEN')
+
+        # Do not save file is overwrite is not allowed.
         else:
-            print(Path(output_csv).stem, 'CSV FILE NOT SAVED')                   # Do not save if overwrite is False
+            print(Path(output_csv).stem, 'CSV FILE NOT SAVED')
+
+    # If output file does not exist yet, create it.
     else:
-        data_frame.to_csv(output_csv, index=False, mode='w')                     # If csv does not exist, save it
+        data_frame.to_csv(output_csv, index=False, mode='w')
         print(Path(output_csv).stem, '*** CSV FILE SAVED ***')
     return
 
 
-def h5db_print_attrs(h5_object):
-    """
-    Prints main structure of hdf5 file.
-    Input: hdf5 opened file to explore.
-    """
-    def print_attrs(name, _):
-        print(name)                                                              # Print filename and attributes
-    h5_object.visititems(print_attrs)                                            # Call inner function
+def save_npz_in_hdf5(npz_files_list, hdf5_path, attributes_dict=None,
+                     verbose=False):
+    """Save content of multiple npz numpy arrays to hdf5 file.
 
+    Parameters
+    ----------
+    npz_files_list : List of Paths
+        Npz saved compressed numpy arrays.
+    hdf5_path : Path
+        Output database hdf5 file.
+    attributes_dict : dict of dicts, optional
+        Npz identifier : {parameters names : float } pairs. If given,
+        add attributes to each npz group. Do nothing otherwise.
+    verbose : bool, optional
+        If True, print output hdf5 structure. Default is False.
 
-def hdf5_swap_groups_and_subgroups(hd, m_keys=None, hd_out=None, verbose=False):
+    Returns
+    -------
+    Path
+        Path of output hdf5 file.
     """
-    Creates a new hdf5 file, using first sub group keys as group keys and group keys
-    as first sub group keys.
-    Inputs: hd. Original hdf5.
-            m_keys. List of output hdf5 groups keys.
-            hd_out. Path of output file.
-            verbose. If True, print output file structure.
-    """
-    if not hd_out:                                                               # Set default output file path
-        hd_out = Path(hd.parent,
-                      str(hd.name).replace(hd.stem, str(hd.stem + '_tr')))
-    with h5py.File(hd, 'r') as db_file:                                          # Open input hdf5
-        if not m_keys:                                                           # Set default groups keys
-            m_keys = list_of_lists_unique([v.keys() for v in db_file.values()])
-        with h5py.File(hd_out, 'w') as out:                                      # Open output hdf5
-            for key in m_keys:                                                   # Iterate trough original subgroups
-                out_grp = out.create_group(key)                                  # Swap group names
-                for group_n, group in db_file.items():                           # Swap data
-                    ds = out_grp.create_dataset(group_n, data=group[key])
-                    ds.attrs.update(group.attrs)                                 # Swap datasets attributes
-            if verbose:                                                          # Print output file structure
-                h5db_print_attrs(out)
-    return hd_out
-
-
-def npz_to_hdf5(npz_files_list, hdf5_path, attributes_dict=None, print_structure=False):
-    """
-    Saves content of multiple npz files into a hdf5 database file.
-    Inputs: npz_files_list. List of Paths of input npz files.
-            hdf5_filename. Path of output file.
-            attributes_dict. List of groups attributes values.
-            print_structure. If True, print structure of output hdf5 file.
-    Output: List of output reference values, taken from keys of arrays in npz files.
-    """
+    # Set default output hdf5 path.
     if not hdf5_path:
-        hdf5_path = Path(npz_files_list[0]).with_suffix('.hdf5')                 # Set default output hdf5 file name
-    ref_vars = []
+        hdf5_path = Path(npz_files_list[0]).with_suffix('.hdf5')
+
+    # Create output hdf5 file
+    #
+    # Iterate over npz files list. Create a group  for each npz file,
+    # using relative orders as groups keys.
     with h5py.File(hdf5_path, 'w') as output_file:
         for model_pos, npz_path in enumerate(npz_files_list):
-            model_no = model_pos + 1                                             # Set npz order as key for hdf5 groups
-            grp = output_file.create_group(str(model_no))                        # Create a group for each npz file
-            if attributes_dict:                                    # Set values of interest as group attributes
-                for k, v in attributes_dict[model_pos]:
+            model_no = model_pos + 1
+            grp = output_file.create_group(str(model_no))
+
+            # Set values of interest as group attributes.
+            if attributes_dict:
+                for k, v in attributes_dict[int(model_no)].items():
                     grp.attrs[k] = v
-            arrays = {k: v for k, v in np.load(npz_path).items()}                # Load npz arrays
-            ref_vars.extend(arrays.keys())                                       # Set variables refs as datasets keys
-            for k, v in arrays.items():                                          # Save npz arrays as datassets
+
+            # Load npz arrays and save them as groups data-sets. Keys
+            # will be whatever keys were present in each npz file.
+            arrays = {k: v for k, v in np.load(npz_path).items()}
+            for k, v in arrays.items():
                 grp.create_dataset(k, data=v)
-    if print_structure:                                                          # Print output file structure
-        with h5py.File(hdf5_path, 'r') as f:
-            h5db_print_attrs(f)
-    return list(set(ref_vars))                                                   # Return list of unique variable refs
+
+        # Print output file structure
+        if verbose:
+            show_hdf5_structure(output_file)
+    return hdf5_path
 
 
-def peer_strong_motion_2csv(csv_file_path):
+def show_hdf5_structure(hdf5_object):
+    """Prints main structure of a hdf5 file.
+
+    Parameters
+    ----------
+    hdf5_object : in-memory loaded hdf5 file
+        Must be loaded trough h5py.File or similar.
+
+    Returns
+    -------
+    None
     """
-    Accommodates typical Strong motion record from PEER, that comes in a plane text file
-    with data disposed in horizontal consecutive arrays.
-    This function serializes all horizontal data in one single column and returns the
-    new data frame in a csv file.
-    Input: csv_file_path. Path of the csv file containing strong motion record.
-    Output: corrected version of the input file.
-    """
-    csv_file_path = Path(csv_file_path).with_suffix('.csv')                      # Normalize input as Path object
-    df = pd.read_csv(csv_file_path, header=None)                                 # Read input csv file
-    df_trans = df.transpose()                                                    # Transpose data for better handling
-    column = []
-    for i in df_trans:                                                           # Extract data column wise
-        column.append(df_trans[i])
-    combined = pd.concat(column, ignore_index=True)                              # Build new dataframe
-    df_out = pd.DataFrame()
-    df_out['A'] = combined
-    df_out.to_csv(Path(str(csv_file_path).                                       # Save corrected csv file
-                       replace(csv_file_path.stem,
-                               csv_file_path.stem + '_corrected')))
+    # Print filename and attributes by calling inner function.
+    def print_attrs(name, _):
+        print(name)
+    hdf5_object.visititems(print_attrs)
     return

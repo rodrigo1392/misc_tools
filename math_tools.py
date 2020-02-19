@@ -1,19 +1,26 @@
-""" Functions to be used by a Python 3 interpreter.
-    Developed by Rodrigo Rivero.
-    https://github.com/rodrigo1392"""
+"""Functions that operate with math data, numpy arrays and Sympy.
+
+Intended to be used within a Python 3 environment.
+Developed by Rodrigo Rivero.
+https://github.com/rodrigo1392
+
+"""
 
 import math
+
 import matplotlib.pyplot as plt
 import numpy as np
+import sympy as sp
+
 from scipy.interpolate import Akima1DInterpolator
 from sympy.solvers.solveset import nonlinsolve, linsolve
 
 SI_CONSTANTS = {'gravity': 9.80665,  # in m/s2
                 }
-CONVERT_FACTORS = {'N-kgf': SI_CONSTANTS['gravity'],  # N to kgf
+CONVERT_FACTORS = {'N-kgf': SI_CONSTANTS['gravity'],
                    'MPa-kgf/cm2':
-                       100 / SI_CONSTANTS['gravity'],  # MPa to kgf/cm2
-                   'kg/m3-kg/cm3': (1 / 1000000),  # kg/m3 to kg/cm3
+                       100 / SI_CONSTANTS['gravity'],
+                   'kg/m3-kg/cm3': (1 / 1000000),
                    }
 
 
@@ -97,7 +104,7 @@ def eval_sympy(expression, substitute_dict):
         Evaluated algebraic expression.
     """
     # Attempt a symbolic eval, check for expression changes, return when
-    # no more changes occur
+    # no more changes occur.
     for _ in range(0, len(substitute_dict) + 1):
         new_expr = expression.subs(substitute_dict)
         if new_expr == expression:
@@ -128,7 +135,7 @@ def extract_unique_sub_arrays(array_like):
     array = np.asarray(array_like)
     assert array.ndim >= 2, 'Array should be mulidimensional'
 
-    # Deal with data types, store array efficiently and filter unique
+    # Deal with data types, store array efficiently and filter unique.
     types = np.dtype((np.void, array.dtype.itemsize * np.prod(array.shape[1:])))
     b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)
     return array[np.unique(b, return_index=True)[1]]
@@ -147,11 +154,11 @@ def generate_primes(amount):
     list
         Prime numbers.
     """
-    # Set first prime and first candidate for generator
+    # Set first prime and first candidate for generator.
     output_list = [2]
     number = 3
 
-    # Generate candidates, test primeness and append them if positive
+    # Generate candidates, test primeness and append them if positive.
     while len(output_list) < amount:
         primeness = True
         for num in range(2, int(number ** 0.5) + 1):
@@ -177,16 +184,36 @@ def generate_primes_to(limit):
     list
         Prime numbers.
     """
-    # Move up python limit for generator
+    # Move up python limit for generator.
     limit = limit + 1
 
-    # Generate candidates, try for and mark composites numbers
+    # Generate candidates, try for and mark composites numbers.
     prime = [True] * limit
     for number in range(2, limit):
         if prime[number]:
             yield number
             for c in range(number * number, limit, number):
                 prime[c] = False
+
+
+def generate_white_noise(mean, std, num_samples):
+    """Generate normalized random values.
+
+    Parameters
+    ----------
+    mean : float
+        Mean of output samples.
+    std : float
+        Standard deviation of output samples.
+    num_samples : int
+        Amount of output samples.
+
+    Returns
+    -------
+    numpy array
+        Numeric samples.
+    """
+    return np.random.normal(mean, std, size=num_samples)
 
 
 def integrate_num_2d(independent, dependent, verbose=False):
@@ -252,7 +279,7 @@ def interpolate_2d(independent, dependent, plot=True):
         'Independent and dependent variables values arrays should be consistent'
 
     # Start interpolator, re-sample independent values, calculate
-    # interpolated dependent values
+    # interpolated dependent values.
     interpolator = Akima1DInterpolator(independent, dependent)
     new_independent = np.linspace(np.amin(independent),
                                   np.amax(np.asarray(independent)),
@@ -338,7 +365,7 @@ def solve_equations_system(variables, equations, replace_values=None):
         Conform the equations system.
     replace_values : dict, optional
         If given, substitute variables for numeric values established
-        in dict, as variable name:value pairs. Default is None
+        in dict, as variable name:value pairs. Default is None.
 
     Returns
     -------
@@ -353,17 +380,17 @@ def solve_equations_system(variables, equations, replace_values=None):
             solver = linsolve
             break
 
-    # Solve equations and extract solutions
+    # Solve equations and extract solutions.
     solution = solver(equations, *variables)
     solution = {variable: list(solution)[0][pos] for
                 pos, variable in enumerate(variables)}
 
-    # Replace constants and extract values
+    # Replace constants and extract values.
     if replace_values is not None:
         solution = {key: sp.simplify(eval_sympy(val, replace_values)) for
                     key, val in solution.items()}
 
-    # Try to show solution with Latex, use ascii if not possible
+    # Try to show solution with Latex, use ascii if not possible.
     try:
         from IPython.display import display
         sp.init_printing(use_latex=True, forecolor='White')
@@ -371,23 +398,3 @@ def solve_equations_system(variables, equations, replace_values=None):
     except ImportError:
         print(solution)
     return solution
-
-
-def white_noise_generator(mean, std, num_samples):
-    """Generate normalized random values.
-
-    Parameters
-    ----------
-    mean : float
-        Mean of output samples.
-    std : float
-        Standard deviation of output samples.
-    num_samples : int
-        Amount of output samples.
-
-    Returns
-    -------
-    numpy array
-        Numeric samples.
-    """
-    return np.random.normal(mean, std, size=num_samples)

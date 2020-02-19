@@ -1,17 +1,30 @@
-""" Functions to be used by a Python 3 interpreter.
-    Developed by Rodrigo Rivero.
-    https://github.com/rodrigo1392"""
+"""Internet related tools.
+
+Intended to be used within a Python 3 environment.
+Developed by Rodrigo Rivero.
+https://github.com/rodrigo1392
+
+"""
 
 import requests
 
 
-def telegram_bot_send_text(bot_token, bot_chat_id, bot_message):
-    """
-    Sends telegram message through bot.
-    Inputs: bot_token. Token of telegram bot.
-            bot_chat_id. ID from chat.
-            bot_message. String to be sent.
-    Output: JSON variable with details of the message.
+def send_message_2telegram_bot(bot_token, bot_chat_id, bot_message):
+    """Sends telegram message through a bot.
+
+    Parameters
+    ----------
+    bot_token : str
+        Token of telegram bot
+    bot_chat_id : str
+        ID from bot chat.
+    bot_message : str
+        Message to be sent.
+
+    Returns
+    -------
+    json
+        Details of the telegram message object.
     """
     send_text = 'https://api.telegram.org/bot' + bot_token +\
                 '/sendMessage?chat_id=' + bot_chat_id + \

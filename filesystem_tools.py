@@ -1,6 +1,10 @@
-""" Functions to be used by a Python 3 interpreter.
-    Developed by Rodrigo Rivero.
-    https://github.com/rodrigo1392"""
+"""Functions to manage os files and Path objects.
+
+Intended to be used within a Python 3 environment.
+Developed by Rodrigo Rivero.
+https://github.com/rodrigo1392
+
+"""
 
 # Flexibility for python 2.x
 try:
@@ -11,233 +15,183 @@ try:
     from pathlib import Path
 except ImportError:
     pass
-from .strings_tools import sort_strings_by_digit, str_extract_last_int
-import numpy as np
 import os
-import re
 import shutil
 import sys
 
+from . import strings_tools as st
+
 
 def check_corrupted_videos(root_path, extensions):
+    """Check video files to detect corrupted ones.
+
+    Filter files by given `extensions`, searching recursively in the
+    `root_path`.
+
+    Parameters
+    ----------
+    root_path : Path
+        Starting path, to be searched recursively.
+    extensions : list of str
+        Video file extensions to look for.
+
+    Returns
+    -------
+    int
+        Amount of good files found.
+    int
+        Amount of corrupted files found.
     """
-    Checks for video files with given extensions, recursively in the root_path
-    Inputs: root_path. Path to be investigated.
-            extensions. List of file extensions to look for.
-    Output: Tuple of amount of good and bad files.
-    """
-    try:                                                                         # Import cv2 package
+    # Load cv2 package to open video files and tqdm module for a fancy
+    # progress bar in command line. Report software versions.
+    try:
         import cv2
     except ImportError:
         sys.exit('NO CV2 MODULE FOUND')
-    try:                                                                         # Import tqdm for fancy progress bar
+    try:
         import tqdm
         progress_bar = True
     except ImportError:
         print('No tqdm module found. Progress bar will not be shown')
         progress_bar = False
         pass
-    print("Python version:", sys.version)                                        # Print Python and CV info
+    print("Python version:", sys.version)
     print("CV2:   ", cv2.__version__)
-    files_paths = []                                                             # Gather paths of video files
+
+    # Gather video files paths and prepare list for progress bar.
+    files_paths = []
     for extension in extensions:
-        files_paths.extend(files_with_extension_lister(root_path, extension))
-    if progress_bar:                                                             # Prepare list for progress bar
+        files_paths.extend(list_files_with_extension(root_path, extension))
+    if progress_bar:
         files_paths = tqdm.tqdm(files_paths)
-    good_files_counter = 0                                                       # Process files
+
+    # Iterate on video files path, trying to open them, catching errors
+    # and counting good files.
+    good_files_counter = 0
     for filename in files_paths:
-        try:                                                                     # Try to open video file
+        try:
             vid = cv2.VideoCapture(filename)
             if not vid.isOpened():
                 print('FILE NOT FOUND:' + filename)
                 raise NameError('File not found')
-        except cv2.error:                                                        # Catch bad video files
+        except cv2.error:
             print('error:' + filename)
             print("cv2.error:")
-        except Exception as e:                                                   # Catch other errors
+        except Exception as e:
             print("Exception:", e)
             print('error:' + filename)
-        else:                                                                    # Count good video files
+        else:
             good_files_counter += 1
-    print("Good files:", good_files_counter)                                     # Print output messages
-    print("Bad files:", len(files_paths) - good_files_counter)
-    return good_files_counter, len(files_paths) - good_files_counter
+    bad_files = len(files_paths) - good_files_counter
+
+    print("Good files:", good_files_counter)
+    print("Bad files:", bad_files)
+    return good_files_counter, bad_files
 
 
-def config_file_extract_input(config_file):
+def create_non_existent_folder(folder_path):
+    """Create a folder if it does not exist yet.
+
+    Parameters
+    ----------
+    folder_path : Path
+        Path of folder to verify/create.
+
+    Returns
+    -------
+    Path
+        Path of verified/created folder.
     """
-    Extract input data from *.cfg file.
-    Input: config_file. Path of file containing input data in an arbitrary
-           number of sections and variables.
-    Output: Dict of input variable name: value pairs.
+    # Normalize input path and attempt to create folder. If it already
+    # exists, do nothing.
+    folder_path = Path(folder_path)
+    try:
+        folder_path.mkdir()
+        print(str(folder_path), 'folder created')
+        return folder_path
+    except FileExistsError:
+        return folder_path
+
+
+def extract_config_from_cfg(cfg_path):
+    """Extract input data from *.cfg file.
+
+    Parameters
+    ----------
+    cfg_path : Path
+        Config file to read from.
+
+    Returns
+    -------
+    dict
+        Config keywords: python objects pairs.
     """
-    cfg = configparser.ConfigParser()                                            # Start parser engine
-    cfg.read(config_file)                                                        # Read config file
-    input_data = ({k.lower(): eval(repr(v)) for k, v in cfg.items(i)}            # Gather all input variables
+    # Start parser engine and read cfg file.
+    cfg = configparser.ConfigParser()
+    cfg.read(cfg_path)
+
+    # Gather all input variables and merge them in one dict.
+    input_data = ({k.lower(): eval(repr(v)) for k, v in cfg.items(i)}
                   for i in cfg.sections())
     input_data = {k: (None if v is '0' else v)
-                  for i in input_data for k, v in i.items()}                     # Merge input data in one dict
+                  for i in input_data for k, v in i.items()}
+
+    # Try to convert variables to Python objects.
     output_data = {}
-    for k, v in input_data.items():                                              # Try to convert vars to Python objects
+    for k, v in input_data.items():
         try:
             output_data[k] = eval(v)
         except SyntaxError:
             output_data[k] = v
         except TypeError:
             output_data[k] = v
-        except:                                                                  # Do not convert if exception is raised
+        except:
             output_data[k] = v
     return output_data
 
 
-def file_finder(root_path, searched_file, sub_folders_option=False):
+def find_file(root_path, searched_file, recursively=False):
+    """Find instances of file, searching in a folder system.
+
+    Parameters
+    ----------
+    root_path : Path
+        Top level folder, start search here.
+    searched_file : str
+        Name of searched file.
+    recursively : bool, optional
+        If True, search folders recursively. Default is False.
+
+    Returns
+    -------
+    list
+        Full Paths of `searched_file` instances.
+    False
+        If file is not found.
     """
-    Finds a file looking in the root_path. It can return multiple found instances.
-    Inputs: root_path. Path to be investigated.
-            searched_file. String with file name searched.
-            full_name_option. Boolean, if True, return files with full path.
-            sub_folder_option. Boolean, if True, do a recursive search in sub-folders
-    Output: Full path(s) of searched file.
-    """
-    paths_list = files_lister(root_path, True, sub_folders_option)               # List all files in root
-    file_path = [i for i in paths_list if str(i.name) == searched_file]          # Extract searched file path from list
-    if not file_path:                                                            # Return False if file not found
+    # List all files in root and extract searched file path.
+    paths_list = list_files(root_path, True, recursively)
+    file_path = [i for i in paths_list if str(i.name) == searched_file]
+    if not file_path:
         print('File not found')
         return False
     return file_path
 
 
-def file_renumber(file_path, delta):
-    """
-    Renames a file, modifying its original name, by adding delta to the last digit found in it.
-    Input: file_path. Path of file to be renamed.
-           delta. Int of number to be added.
-    """
-    file_path = Path(file_path)                                                  # Normalize input to Path object
-    number = str_extract_last_int(file_path)                                     # Find numbers in original path
-    file_path.rename(Path(str(file_path).replace(str(number),                    # Rename file with new number
-                                                 str(number + delta))))
-    return
+def generate_folder_walker(root_path, level=1):
+    """Creates generator that walks a folder recursively.
 
+    Parameters
+    ----------
+    root_path : Path
+        Top level folder, start search here.
+    level : int
+        Amount of levels to walk for.
 
-def file_save_with_old_version(file_path):
-    """
-    Avoids file overwriting, by saving previous version of file with and 'old_' prefix.
-    Input: file_path. Path of file to be saved.
-    """
-    file_path = Path(file_path)
-    base_version_file = Path(str(file_path).replace(file_path.name,              # Old version file path
-                                                    'old_' + file_path.name))
-    if base_version_file.exists():                                               # If old version exists:
-        shutil.copy(str(base_version_file), str(file_path))                      # create a copy without 'old' prefix
-        return file_path                                                         # return path of current version
-    elif Path(file_path).exists():                                               # If not old version does not exists:
-        shutil.copy(file_path, base_version_file)                                # create a copy with 'old' prefix
-        return file_path                                                         # return path of current version
-    else:
-        print(Path(file_path).name, 'FILE NOT FOUND IN', str(file_path.parent))  # Report if no file was found
-        return None
-
-
-def files_in_folder_2txt(root_path, out_file_path=None, full_name_option=False, sub_folders_option=False):
-    """
-    Saves all files found in root_path in a txt file.
-    Inputs: root_path. Path to be investigated.
-            out_file_path. Path of output file.
-            full_name_option. Boolean, if True, return files with full path.
-            sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
-    """
-    if not out_file_path:
-        out_file_path = Path(root_path, 'files_list')                            # Set default output file
-    paths_list = files_lister(root_path, full_name_option, sub_folders_option)   # List files in root
-    with open(Path(out_file_path).with_suffix('.txt'), 'w+') as file_out:        # Normalize output file suffix and save
-        file_out.write('\n'.join(paths_list))
-    return out_file_path
-
-
-def files_lister(root_path, full_name_option=True, sub_folders_option=True):
-    """
-    Lists all the files in root_path.
-    Inputs: root_path. Path to be investigated.
-            full_name_option. Boolean, if True, return files with full path, otherwise, just the file names.
-            sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
-    Output: List of all existing files.
-    """
-    root_path = Path(root_path)                                                  # Normalize input to Path object
-    if not sub_folders_option:                                                   # List files without recursion or,
-        paths_list = [f for f in root_path.iterdir() if f.is_file()]
-    else:                                                                        # List files with recursion
-        paths_list = [f for f in root_path.rglob("*") if f.is_file()]
-    if not full_name_option:                                                     # Optionally remove parent directories
-        paths_list = [f.name for f in paths_list]
-    try:
-        return sort_strings_by_digit(paths_list)                                 # Try to sort files by digits
-    except IndexError:
-        return paths_list
-
-
-def files_with_extension_lister(root_path, extension, full_name_option=True, sub_folders_option=True):
-    """
-    Lists all the files in root_path with a given extension.
-    Inputs: root_path. Path to be investigated.
-            extension. String with the file extension to be searched for.
-            full_name_option. Boolean, if True, return files with full path.
-            sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
-    Output: List of Path objects.
-    """
-    paths_list = files_lister(root_path, full_name_option, sub_folders_option)   # List files in root
-    paths_list = [i for i in paths_list if                                       # Filter files by extension
-                  i.suffix == '.' + extension.replace('.', '')]
-    return paths_list
-
-
-def files_with_name_lister(root_path, input_string, full_name_option=True, sub_folders_option=True):
-    """
-    Lists all the files in root_path that contain a given string in its name.
-    Inputs: root_path. Path to be investigated.
-            input_name. String to be looked for in file names.
-            full_name_option. Boolean, if True, return files with full path.
-            sub_folder_option. Boolean, if True, do a recursive search in sub-folders.
-    Output: List of Path objects.
-    """
-    paths_list = files_lister(root_path, full_name_option, sub_folders_option)   # List all files in root
-    paths_list = [i for i in paths_list if input_string in i.name]               # Filter files by substring
-    return paths_list
-
-
-def folder_create_if_not(folder_path):
-    """
-    Creates folder if it does not exist.
-    Input: folder_path. Path of folder to be verified/created.
-    """
-    folder_path = Path(folder_path)                                              # Normalize input to Path object
-    try:
-        folder_path.mkdir()                                                      # Attempt to create folder
-        print(str(folder_path), 'folder created')
-        return folder_path
-    except FileExistsError:                                                      # If it already exists, do nothing
-        return folder_path
-
-
-def folder_size(root_path=None, sub_folders_option=True):
-    """
-    Calculates the size of a given folder.
-    Input: root_path. Root folder of interest. If not given, start on current interpreter dir.
-    Output: Size of folder in MB.
-    """
-    if not root_path:
-        root_path = Path.cwd()
-    paths_list = files_lister(root_path, True, sub_folders_option)               # List files in root
-    return round(sum(f.stat().st_size for f in paths_list) / (1024*1024), 3)     # Return sum of file sizes in MB
-
-
-def folder_walk_level(root_path, level=1):
-    """
-    Returns a generator to be used in a recursively os file walking. It limits the level of sub_folders
-    available for the walker algorithm.
-    Inputs: root_path. Absolute path of top level folder of interest.
-            level. Int, accounts for sub_folders levels.
-    Output: Generator.
+    Yields
+    -------
+    Path
+        Paths of accessed folders.
     """
     root_path = root_path.rstrip(os.path.sep)
     assert os.path.isdir(root_path)
@@ -247,3 +201,246 @@ def folder_walk_level(root_path, level=1):
         num_sep_this = root.count(os.path.sep)
         if num_sep + level <= num_sep_this:
             del dirs[:]
+
+
+def list_files(root_path, full_path=True, recursively=True):
+    """List all files paths in a folder.
+
+    Parameters
+    ----------
+    root_path : Path
+        Top level folder, start search here.
+    full_path : bool, optional
+        If True, gets Full Path of files, instead of just files names.
+    recursively : bool, optional
+        If True, search folders recursively. Default is False.
+
+    Returns
+    -------
+    List
+        Paths of all existing files.
+    """
+    root_path = Path(root_path)
+
+    # List files with or without recursion.
+    if recursively:
+        paths_list = [f for f in root_path.rglob("*") if f.is_file()]
+    else:
+        paths_list = [f for f in root_path.iterdir() if f.is_file()]
+    if not full_path:
+        paths_list = [f.name for f in paths_list]
+
+    # Try to sort files by digits
+    try:
+        return st.sort_strings_by_digit(paths_list)
+    except IndexError:
+        return paths_list
+
+
+def list_files_with_extension(root_path, extension, full_path=True,
+                              recursively=True):
+    """List all files paths in a folder, filtered by a given suffix.
+
+    Parameters
+    ----------
+    root_path : Path
+        Top level folder, start search here.
+    extension : str
+        Extension of files to list.
+    full_path : bool, optional
+        If True, gets Full Path of files, instead of just files names.
+    recursively : bool, optional
+        If True, search folders recursively. Default is False.
+
+    Returns
+    -------
+    List
+        Paths of filtered files.
+    """
+    # List all files in root and filter them by extension.
+    paths_list = list_files(root_path, full_path, recursively)
+    paths_list = [i for i in paths_list if
+                  i.suffix == '.' + extension.replace('.', '')]
+    return paths_list
+
+
+def list_files_with_substring(root_path, input_string, full_path=True,
+                              recursively=True):
+    """List all files paths in a folder, filtered by given substring.
+
+    Parameters
+    ----------
+    root_path : Path
+        Top level folder, start search here.
+    input_string : str
+        String to filter paths by.
+    full_path : bool, optional
+        If True, gets Full Path of files, instead of just files names.
+    recursively : bool, optional
+        If True, search folders recursively. Default is False.
+
+    Returns
+    -------
+    List
+        Paths of filtered files.
+    """
+    # List all files in root and filter them by substring.
+    paths_list = list_files(root_path, full_path, recursively)
+    paths_list = [i for i in paths_list if input_string in i.name]
+    return paths_list
+
+
+def manage_old_version_file(file_path):
+    """Avoid file overwriting, managing 'old' version of it.
+
+    Algorithm looks for and 'old_' version of `file_path` in its same
+    directory. If it finds it, returns a copy of it, if not, creates a
+    copy of `file_path` as 'old_' version, setting it as the new backup
+    file. This allows to have a backup of `file_path` available.
+
+    Parameters
+    ----------
+    file_path : Path
+        Path of file of interest.
+
+    Returns
+    -------
+    Path
+        Path of file that can be safely modified.
+    """
+    # Set old version file path
+    file_path = Path(file_path)
+    old_version_file = modify_filename_in_path(file_path,
+                                               added='old_',
+                                               prefix=True)
+
+    # If old version exists, create a copy without prefix and return
+    # that path. If not, create a copy with prefix and set it as the
+    # new backup file.
+    if old_version_file.exists():
+        shutil.copy(str(old_version_file), str(file_path))
+        return file_path
+    elif Path(file_path).exists():
+        shutil.copy(file_path, old_version_file)
+        return file_path
+
+    # Report if no file was found
+    else:
+        print(Path(file_path).name, 'FILE NOT FOUND IN', str(file_path.parent))
+        return None
+
+
+def modify_filename_in_path(file_path, new_name=None, added=None, prefix=False):
+    """Modifies file name of a given full path.
+
+    The algorithm considers three types of modifications:
+    - Full file name replace.
+    - Adding of prefix or suffix to file name.
+    - Combination of former two.
+
+    Parameters
+    ----------
+    file_path : Path
+        Full Path of file name to be modified.
+    new_name : str, optional
+        If given, replace file name with it.
+    added : str, optional
+        If given, add to file name as prefix or suffix
+    prefix : bool, optional
+        If True, add `added` as prefix. Otherwise, add it as suffix.
+
+    Returns
+    -------
+    Path
+        Modified full Path.
+    """
+    # Normalize input to Path object and build new file name.
+    file_path = Path(file_path)
+    if new_name is None:
+        new_name = file_path.stem
+    if added is not None:
+        if prefix:
+            new_name = added + new_name
+        else:
+            new_name = new_name + added
+    output = Path(file_path.parent, new_name).with_suffix(file_path.suffix)
+    return output
+
+
+def renumber_file(file_path, delta):
+    """Modify a file name adding a number to the last digit found in it.
+
+    Parameters
+    ----------
+    file_path : Path
+        Path of file to be renamed.
+    delta : int
+        Number to be add to the last digit found in file name.
+
+    Returns
+    -------
+    Path
+        Full Path of new file name.
+    """
+    # Normalize input to Path object and extract original number
+    file_path = Path(file_path)
+    number = st.extract_number_from_str(file_path)
+
+    # Rename file
+    output_path = str(file_path).replace(str(number), str(number + delta))
+    file_path.rename(output_path)
+    return output_path
+
+
+def save_files_list_2txt(root_path, txt_path=None, full_path=False,
+                         recursively=False):
+    """Save all files paths in a folder to a txt file.
+
+    Parameters
+    ----------
+    root_path : Path
+        Top level folder, start search here.
+    txt_path : Path, optional
+        Path of txt file. If not defined, create it in current folder.
+    full_path : bool, optional
+        If True, gets Full Path of files, instead of just files names.
+    recursively : bool, optional
+        If True, search folders recursively. Default is False.
+
+    Returns
+    -------
+    Path
+        Path of txt file.
+    """
+    # Set default output file and normalize input suffix
+    if not txt_path:
+        txt_path = Path(root_path, 'files_list')
+    txt_path = txt_path.with_suffix('.txt')
+
+    # List all files in root and save to output txt
+    paths_list = list_files(root_path, full_path, recursively)
+    with open(txt_path, 'w+') as file_out:
+        file_out.write('\n'.join(paths_list))
+    return txt_path
+
+
+def size_folder(root_path=None, recursively=True):
+    """Calculates the size of a given folder in MB.
+
+    Parameters
+    ----------
+    root_path : Path, optional
+        Folder to find the size of. If None given, size current folder.
+    recursively : bool, optional
+        If True, consider sub-folders recursively. Default is False.
+
+    Returns
+    -------
+    float
+        Size of folder in MB.
+    """
+    # List all files in root folder and sum their stats
+    if root_path is None:
+        root_path = Path.cwd()
+    paths_list = list_files(root_path, True, recursively)
+    return round(sum(f.stat().st_size for f in paths_list) / (1024*1024), 3)
