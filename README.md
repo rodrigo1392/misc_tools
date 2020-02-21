@@ -1,2 +1,2 @@
-# tools_submodule
-Common general purpose Python functions, intented to be included as Git submodule in other projects.
+# misc_tools
+Common miscellaneous Python functions, intented to be included as Git submodule in other projects.
