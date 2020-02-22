@@ -15,78 +15,11 @@ try:
     from pathlib import Path
 except ImportError:
     pass
+import ast
 import os
 import shutil
-import sys
 
 from . import strings_tools as st
-
-
-def check_corrupted_videos(root_path, extensions):
-    """Check video files to detect corrupted ones.
-
-    Filter files by given `extensions`, searching recursively in the
-    `root_path`.
-
-    Parameters
-    ----------
-    root_path : Path
-        Starting path, to be searched recursively.
-    extensions : list of str
-        Video file extensions to look for.
-
-    Returns
-    -------
-    int
-        Amount of good files found.
-    int
-        Amount of corrupted files found.
-    """
-    # Load cv2 package to open video files and tqdm module for a fancy
-    # progress bar in command line. Report software versions.
-    try:
-        import cv2
-    except ImportError:
-        sys.exit('NO CV2 MODULE FOUND')
-    try:
-        import tqdm
-        progress_bar = True
-    except ImportError:
-        print('No tqdm module found. Progress bar will not be shown')
-        progress_bar = False
-        pass
-    print("Python version:", sys.version)
-    print("CV2:   ", cv2.__version__)
-
-    # Gather video files paths and prepare list for progress bar.
-    files_paths = []
-    for extension in extensions:
-        files_paths.extend(list_files_with_extension(root_path, extension))
-    if progress_bar:
-        files_paths = tqdm.tqdm(files_paths)
-
-    # Iterate on video files path, trying to open them, catching errors
-    # and counting good files.
-    good_files_counter = 0
-    for filename in files_paths:
-        try:
-            vid = cv2.VideoCapture(filename)
-            if not vid.isOpened():
-                print('FILE NOT FOUND:' + filename)
-                raise NameError('File not found')
-        except cv2.error:
-            print('error:' + filename)
-            print("cv2.error:")
-        except Exception as e:
-            print("Exception:", e)
-            print('error:' + filename)
-        else:
-            good_files_counter += 1
-    bad_files = len(files_paths) - good_files_counter
-
-    print("Good files:", good_files_counter)
-    print("Bad files:", bad_files)
-    return good_files_counter, bad_files
 
 
 def create_non_existent_folder(folder_path):
@@ -131,22 +64,21 @@ def extract_config_from_cfg(cfg_path):
     cfg.read(cfg_path)
 
     # Gather all input variables and merge them in one dict.
-    input_data = ({k.lower(): eval(repr(v)) for k, v in cfg.items(i)}
+    input_data = ({k.lower(): v for k, v in cfg.items(i)}
                   for i in cfg.sections())
-    input_data = {k: (None if v is '0' else v)
-                  for i in input_data for k, v in i.items()}
+    config_dict = {}
+    for i in input_data:
+        config_dict.update(i)
 
     # Try to convert variables to Python objects.
     output_data = {}
-    for k, v in input_data.items():
+    for k, value in config_dict.items():
         try:
-            output_data[k] = eval(v)
+            output_data[k] = ast.literal_eval(value)
         except SyntaxError:
-            output_data[k] = v
+            output_data[k] = value
         except TypeError:
-            output_data[k] = v
-        except:
-            output_data[k] = v
+            output_data[k] = value
     return output_data
 
 
@@ -179,7 +111,7 @@ def find_file(root_path, searched_file, recursively=False):
 
 
 def generate_folder_walker(root_path, level=1):
-    """Creates generator that walks a folder recursively.
+    """Create generator that walks a folder recursively.
 
     Parameters
     ----------
@@ -189,7 +121,7 @@ def generate_folder_walker(root_path, level=1):
         Amount of levels to walk for.
 
     Yields
-    -------
+    ------
     Path
         Paths of accessed folders.
     """
@@ -319,19 +251,21 @@ def manage_old_version_file(file_path):
     # new backup file.
     if old_version_file.exists():
         shutil.copy(str(old_version_file), str(file_path))
-        return file_path
+        output = file_path
     elif Path(file_path).exists():
         shutil.copy(file_path, old_version_file)
-        return file_path
+        output = file_path
 
     # Report if no file was found
     else:
         print(Path(file_path).name, 'FILE NOT FOUND IN', str(file_path.parent))
-        return None
+        output = None
+    return output
 
 
-def modify_filename_in_path(file_path, new_name=None, added=None, prefix=False):
-    """Modifies file name of a given full path.
+def modify_filename_in_path(file_path, new_name=None, added=None,
+                            prefix=False):
+    """Modify file name of a given full path.
 
     The algorithm considers three types of modifications:
     - Full file name replace.
@@ -425,7 +359,7 @@ def save_files_list_2txt(root_path, txt_path=None, full_path=False,
 
 
 def size_folder(root_path=None, recursively=True):
-    """Calculates the size of a given folder in MB.
+    """Calculate the size of a given folder in MB.
 
     Parameters
     ----------

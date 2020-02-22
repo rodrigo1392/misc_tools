@@ -1,0 +1,10 @@
+h5py
+IPython
+matplotlib
+numpy
+pandas
+pytest
+rpy2
+scipy
+sympy
+tqdm

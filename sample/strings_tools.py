@@ -43,7 +43,7 @@ def extract_number_from_str(input_string):
 
 
 def format_strings_for_cmd(input_list):
-    """Transforms a list of string into cmd compatible command.
+    """Transform a list of string into cmd compatible command.
 
     Parameters
     ----------
@@ -71,7 +71,7 @@ def get_uniques_in_list_of_lists(input_list):
     List
         Unique values in input object.
     """
-    return list(set([item for sublist in input_list for item in sublist]))
+    return list({item for sublist in input_list for item in sublist})
 
 
 def list_characters(start_char='A', end_char='Z', capitalize=True):
@@ -102,7 +102,7 @@ def list_characters(start_char='A', end_char='Z', capitalize=True):
         'Input data should be string type'
 
     # Get list of ascii characters and with 'aa', 'ab', etc.
-    base_list = [i for i in string.ascii_lowercase]
+    base_list = list(string.ascii_lowercase)
     for i in base_list:
         base_list = base_list + [i + c for c in string.ascii_lowercase]
 

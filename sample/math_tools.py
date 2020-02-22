@@ -12,8 +12,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sympy as sp
 
+from IPython.display import display
 from scipy.interpolate import Akima1DInterpolator
 from sympy.solvers.solveset import nonlinsolve, linsolve
+
 
 SI_CONSTANTS = {'gravity': 9.80665,  # in m/s2
                 }
@@ -48,7 +50,7 @@ def check_array_consecutiveness(array_like):
     # Normalize input to numpy array object and flatten it.
     array = np.asarray(array_like)
     array = array.flatten()
-    assert not array.dtype.kind in {'U', 'S'}, \
+    assert array.dtype.kind not in {'U', 'S'}, \
         'Array should contain numeric data only'
 
     # Check for not consecutive values and gather their positions.
@@ -80,12 +82,14 @@ def convert_units(quantity, conversion, inverse=False):
     AssertionError
         Conversion factor not established `CONVERT_FACTORS` dictionary.
     """
-    assert conversion in CONVERT_FACTORS.keys(), 'Conversion factor not defined'
+    assert conversion in CONVERT_FACTORS.keys(),\
+        'Conversion factor not defined'
 
     if not inverse:
-        return quantity * CONVERT_FACTORS[conversion]
+        converted = quantity * CONVERT_FACTORS[conversion]
     else:
-        return quantity * (1 / CONVERT_FACTORS[conversion])
+        converted = quantity * (1 / CONVERT_FACTORS[conversion])
+    return converted
 
 
 def eval_sympy(expression, substitute_dict):
@@ -108,9 +112,8 @@ def eval_sympy(expression, substitute_dict):
     for _ in range(0, len(substitute_dict) + 1):
         new_expr = expression.subs(substitute_dict)
         if new_expr == expression:
-            return new_expr
-        else:
-            expression = new_expr
+            break
+    return new_expr
 
 
 def extract_unique_sub_arrays(array_like):
@@ -136,9 +139,11 @@ def extract_unique_sub_arrays(array_like):
     assert array.ndim >= 2, 'Array should be mulidimensional'
 
     # Deal with data types, store array efficiently and filter unique.
-    types = np.dtype((np.void, array.dtype.itemsize * np.prod(array.shape[1:])))
-    b = np.ascontiguousarray(array.reshape(array.shape[0], -1)).view(types)
-    return array[np.unique(b, return_index=True)[1]]
+    types = np.dtype((np.void, array.dtype.itemsize *
+                      np.prod(array.shape[1:])))
+    contiguous = np.ascontiguousarray(array.reshape(array.shape[0],
+                                                    -1)).view(types)
+    return array[np.unique(contiguous, return_index=True)[1]]
 
 
 def generate_primes(amount):
@@ -192,8 +197,8 @@ def generate_primes_to(limit):
     for number in range(2, limit):
         if prime[number]:
             yield number
-            for c in range(number * number, limit, number):
-                prime[c] = False
+            for _ in range(number * number, limit, number):
+                prime[_] = False
 
 
 def generate_white_noise(mean, std, num_samples):
@@ -242,7 +247,7 @@ def integrate_num_2d(independent, dependent, verbose=False):
         `independent` and `dependent` arrays have different dimensions.
     """
     assert independent.shape == dependent.shape,\
-        'Independent and dependent variables values arrays should be consistent'
+        'Independent and dependent variables arrays should be consistent'
     integral = np.trapz(independent, dependent)
     plt.plot(independent, dependent, markersize=5, marker='o')
     plt.show()
@@ -276,7 +281,7 @@ def interpolate_2d(independent, dependent, plot=True):
         `x` and `y` arrays have different dimensions.
     """
     assert independent.shape == dependent.shape,\
-        'Independent and dependent variables values arrays should be consistent'
+        'Independent and dependent variables arrays should be consistent'
 
     # Start interpolator, re-sample independent values, calculate
     # interpolated dependent values.
@@ -287,19 +292,19 @@ def interpolate_2d(independent, dependent, plot=True):
     new_dependent = interpolator(new_independent)
     if plot:
         fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111)
-        ax.plot(independent, dependent, marker='o')
-        ax.plot(new_independent, new_dependent)
+        axes = fig.add_subplot(111)
+        axes.plot(independent, dependent, marker='o')
+        axes.plot(new_independent, new_dependent)
         plt.show()
     return new_independent, new_dependent
 
 
-def ishigami_eq(x1, x2, x3):
+def ishigami_eq(x_1, x_2, x_3):
     """Mathematical Ishigami function of three variables.
 
     Parameters
     ----------
-    x1, x2, x3 : numpy arrays
+    x_1, x_2, x_3 : numpy arrays
         Input independent variables.
 
     Returns
@@ -308,14 +313,14 @@ def ishigami_eq(x1, x2, x3):
         Dependent variable.
 
     Notes
-    -------
+    -----
     The Ishigami function of Ishigami & Homma (1990) is used as a test
     for uncertainty and sensitivity analysis methods, because it
     exhibits strong non-linearity and no-monotonicity.
-    It also has a peculiar dependence on x3, as described by Sobol
+    It also has a peculiar dependence on x_3, as described by Sobol
     & Levitan (1999).
     """
-    return np.sin(x1) + 7 * np.sin(x2) ** 2 + 0.1 * x3 ** 4 * np.sin(x1)
+    return np.sin(x_1) + 7 * np.sin(x_2) ** 2 + 0.1 * x_3 ** 4 * np.sin(x_1)
 
 
 def round_down_n(input_f, base=5):
@@ -375,8 +380,8 @@ def solve_equations_system(variables, equations, replace_values=None):
     # If a Matrix is present in the system, use linear solver;
     # otherwise, load a non linear solver.
     solver = nonlinsolve
-    for eq in equations:
-        if isinstance(eq, sp.Matrix):
+    for equation in equations:
+        if isinstance(equation, sp.Matrix):
             solver = linsolve
             break
 
@@ -392,7 +397,6 @@ def solve_equations_system(variables, equations, replace_values=None):
 
     # Try to show solution with Latex, use ascii if not possible.
     try:
-        from IPython.display import display
         sp.init_printing(use_latex=True, forecolor='White')
         display(solution)
     except ImportError:

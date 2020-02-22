@@ -1,4 +1,14 @@
 .idea/
+.spyproject/
+build/
+dist/
+misc_tools.egg-info/
+**/*py_cache*/**
+.pylint.d/
+*pylint*/
+**/*pylint*/**
+**/*pytest*/**
+*egg*/
 *.iml
 __pycache__/
 telegram_bot_send_message.cfg

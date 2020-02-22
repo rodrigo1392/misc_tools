@@ -31,9 +31,9 @@ def calculate_empirical_cdf(variable_values):
         Accumulated percentages of relative variable values.
     """
     # Sort array and calculate accumulated percentages.
-    xs = np.sort(variable_values)
-    ys = np.arange(1, len(xs) + 1) / float(len(xs))
-    return xs, ys
+    values = np.sort(variable_values)
+    accum_percentages = np.arange(1, len(values) + 1) / float(len(values))
+    return values, accum_percentages
 
 
 def code_variable_value(real_value, limits):
@@ -92,28 +92,28 @@ def generate_halton_sequence(dims_no, points_no):
         Multidimensional array with generated points, in (0, 1) range.
     """
     # Initialize empty arrays and fill them with nan values.
-    h = np.empty(points_no * dims_no)
-    h.fill(np.nan)
-    p = np.empty(points_no)
-    p.fill(np.nan)
+    matrix = np.empty(points_no * dims_no)
+    matrix.fill(np.nan)
+    points_values = np.empty(points_no)
+    points_values.fill(np.nan)
 
     # Run generator and fill output arrays
     primes = mt.generate_primes(dims_no)
     log_points = math.log(points_no + 1)
     for dim in range(dims_no):
         prime = primes[dim]
-        n = int(math.ceil(log_points / math.log(prime)))
+        limit = int(math.ceil(log_points / math.log(prime)))
         power = pow
-        for t in range(n):
-            p[t] = power(prime, -(t + 1))
-        for j in range(points_no):
-            d = j + 1
-            sum_ = math.fmod(d, prime) * p[0]
-            for t in range(1, n):
-                d = math.floor(d / prime)
-                sum_ += math.fmod(d, prime) * p[t]
-            h[j * dims_no + dim] = sum_
-    return h.reshape(points_no, dims_no)
+        for _ in range(limit):
+            points_values[_] = power(prime, -(_ + 1))
+        for point in range(points_no):
+            edge = point + 1
+            sum_ = math.fmod(edge, prime) * points_values[0]
+            for _ in range(1, limit):
+                edge = math.floor(edge / prime)
+                sum_ += math.fmod(edge, prime) * points_values[_]
+            matrix[point * dims_no + dim] = sum_
+    return matrix.reshape(points_no, dims_no)
 
 
 def generate_monte_carlo_sequence(dims_no, points_no):

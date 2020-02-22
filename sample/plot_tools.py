@@ -39,7 +39,7 @@ def calculate_golden_fig_size(width, fraction=1):
 
 def calculate_plot_ticks(input_axes, ticks_no=4, decimals_no=2,
                          identical_axes=False):
-    """Calculates ticks positions for matplotlib 2D plots.
+    """Calculate ticks positions for matplotlib 2D plots.
 
     Parameters
     ----------

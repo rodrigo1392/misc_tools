@@ -10,7 +10,7 @@ import requests
 
 
 def send_message_2telegram_bot(bot_token, bot_chat_id, bot_message):
-    """Sends telegram message through a bot.
+    """Send telegram message through a bot.
 
     Parameters
     ----------
