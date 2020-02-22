@@ -6,7 +6,17 @@ https://github.com/rodrigo1392
 
 """
 
+import os
+
 import setuptools
+from pathlib import Path
+
+
+root = Path(__file__).parent
+os.chdir(str(root))
+
+
+print(setuptools.find_packages())
 
 with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()
