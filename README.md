@@ -1,10 +1,10 @@
-# Miscellaneous tools.
+# Miscellaneous tools
 
 This package contains miscellaneous Python functions, intented to be included as a Git submodule in other projects.
 
 # Installation
 
-Easisest way to install the package is to call.
+Easisest way to install the package is calling:
 
 ```pip install misc_tools```
 
