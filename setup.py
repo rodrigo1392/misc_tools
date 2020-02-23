@@ -16,8 +16,6 @@ root = Path(__file__).parent
 os.chdir(str(root))
 
 
-print(setuptools.find_packages())
-
 with open("README.md", "r") as fh:
     LONG_DESCRIPTION = fh.read()
 
@@ -25,14 +23,14 @@ with open("requirements.txt") as f:
     INSTALL_REQUIRES = [i.strip('\n') for i in f.readlines()]
 
 setuptools.setup(
-    name="misc_tools",
+    name="pymiscell",
     version="0.0.1",
     author="Rodrigo Rivero",
     author_email="rodrigo.m.rivero13@gmail.com",
     description="A package with miscellaneous, common use tools",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url="https://github.com/rodrigo1392/misc_tools",
+    url="https://github.com/rodrigo1392/pymiscell",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
