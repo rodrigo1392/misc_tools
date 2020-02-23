@@ -1,12 +1,12 @@
 # Miscellaneous tools
 
-This package contains miscellaneous Python functions, intented to be included as a Git submodule in other projects.
+This package contains miscellaneous Python functions, intented to be included across more complex projects.
 
 # Installation
 
 Easisest way to install the package is calling:
 
-```pip install misc_tools```
+```pip install pymiscell```
 
 Nevertheles, if you use a conda manager based environment, such as [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) distributions, then you should first install required dependencies, using conda installer:
 
