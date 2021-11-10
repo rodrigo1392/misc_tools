@@ -164,7 +164,8 @@ def list_files(root_path, full_path=True, recursively=True):
 
     # Try to sort files by digits
     try:
-        return st.sort_strings_by_digit(paths_list)
+        sorted_list_as_strings = st.sort_strings_by_digit(paths_list)
+        return [Path(i) for i in sorted_list_as_strings]
     except IndexError:
         return paths_list
 

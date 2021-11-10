@@ -133,8 +133,13 @@ def sort_strings_by_digit(paths_list):
     # Extract integers and try to sort input list by them. Catch and
     # report digits error.
     try:
-        numbers = [extract_number_from_str(i) for i in paths_list]
-        paths_list = [x for _, x in sorted(zip(numbers, paths_list))]
+        temp = paths_list[0]
+        print(temp)
+        print(type(temp))
+        paths_list = [str(i) for i in paths_list]
+        paths_list.sort(key=lambda x:[int(c) if c.isdigit() else c for c in
+                                      re.split(r'(\d+)', x)])
     except IndexError:
         print('WARNING: COULD NOT SORT STRINGS LIST BY NUMBER')
     return paths_list
+
